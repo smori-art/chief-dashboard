@@ -1,0 +1,87 @@
+# Chief Dashboard Configuration
+app:
+  title: "Chief Dashboard - タイ食品スーパー月次ダッシュボード"
+  timezone: "Asia/Bangkok"
+  locale: "ja_JP"
+  data_retention_months: 36
+  cache_ttl_seconds: 300
+  page_load_timeout_seconds: 10
+
+bigquery:
+  project_id: "${GCP_PROJECT_ID}"
+  datasets:
+    raw: "${BQ_DATASET_RAW}"
+    stg: "${BQ_DATASET_STG}"
+    mart: "${BQ_DATASET_MART}"
+  location: "asia-southeast1"
+
+gcs:
+  bucket: "${GCS_BUCKET}"
+  upload_prefix: "uploads/"
+  temp_prefix: "temp/"
+
+auth:
+  mode: "simple"  # simple | entraid
+  simple:
+    session_expiry_hours: 8
+  entraid:
+    tenant_id: "${ENTRAID_TENANT_ID}"
+    client_id: "${ENTRAID_CLIENT_ID}"
+    redirect_uri: "${ENTRAID_REDIRECT_URI}"
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+
+teams:
+  mode: "webhook"  # webhook | graph
+  webhook:
+    url: "${TEAMS_WEBHOOK_URL}"
+  graph:
+    client_id: "${TEAMS_GRAPH_CLIENT_ID}"
+    tenant_id: "${TEAMS_GRAPH_TENANT_ID}"
+    channel_id: "${TEAMS_CHANNEL_ID}"
+
+departments:
+  - id: "food"
+    name: "食品"
+    cost_method: "moving_average"
+    inventory_method: "theoretical"
+  - id: "produce"
+    name: "青果"
+    cost_method: "purchase_cost"
+    inventory_method: "physical_count"
+  - id: "seafood"
+    name: "鮮魚"
+    cost_method: "purchase_cost"
+    inventory_method: "physical_count"
+  - id: "meat"
+    name: "精肉"
+    cost_method: "purchase_cost"
+    inventory_method: "physical_count"
+  - id: "deli"
+    name: "惣菜"
+    cost_method: "purchase_cost"
+    inventory_method: "physical_count"
+  - id: "store_mgmt"
+    name: "店舗管理"
+    cost_method: "purchase_cost"
+    inventory_method: "physical_count"
+
+excel_import:
+  max_file_size_mb: 100
+  supported_formats:
+    - ".xlsx"
+    - ".xls"
+    - ".csv"
+  column_mappings_file: "etl/column_mappings.yaml"
+
+pdf:
+  engine: "weasyprint"  # weasyprint | reportlab
+  page_size: "A4"
+  orientation: "portrait"
+
+performance:
+  mart_refresh_schedule: "0 2 * * *"  # 2am daily
+  monthly_finalize_day: 5  # 5th of each month
+  forecast_min_days: 7  # minimum days before generating forecast

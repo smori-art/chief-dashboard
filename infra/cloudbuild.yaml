@@ -1,0 +1,48 @@
+# Cloud Build configuration for Cloud Run deployment
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:${SHORT_SHA}'
+      - '-t'
+      - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:latest'
+      - '.'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:${SHORT_SHA}'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'chief-dashboard'
+      - '--image=asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:${SHORT_SHA}'
+      - '--region=asia-southeast1'
+      - '--platform=managed'
+      - '--port=8501'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=3'
+      - '--timeout=300'
+      - '--set-env-vars=GCP_PROJECT_ID=${PROJECT_ID}'
+      - '--allow-unauthenticated'
+
+images:
+  - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:${SHORT_SHA}'
+  - 'asia-southeast1-docker.pkg.dev/${PROJECT_ID}/chief-dashboard/app:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

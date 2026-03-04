@@ -1,0 +1,362 @@
+# ============================================================
+# Column Mappings: Excel source columns -> BigQuery target columns
+# For each source type, define:
+#   - target_table: BQ raw table name
+#   - columns: mapping of BQ column -> list of possible Excel column names
+#   - required: list of required BQ columns
+#   - date_columns: columns to parse as dates
+#   - numeric_columns: columns to parse as numeric
+# ============================================================
+
+sales_item_daily:
+  description: "日別・店舗別・商品別売上"
+  target_table: "raw_sales_item_daily"
+  stg_table: "f_sales_item_daily"
+  columns:
+    date:
+      - "日付"
+      - "date"
+      - "売上日"
+      - "Date"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+      - "StoreCode"
+      - "Store ID"
+    sku:
+      - "商品コード"
+      - "SKU"
+      - "sku"
+      - "商品CD"
+      - "JAN"
+      - "JANコード"
+    product_name:
+      - "商品名"
+      - "product_name"
+      - "品名"
+    dept_name:
+      - "部門"
+      - "部門名"
+      - "dept_name"
+      - "Department"
+    cat_l:
+      - "大分類"
+      - "大分類名"
+      - "cat_l"
+      - "Category L"
+    cat_m:
+      - "中分類"
+      - "中分類名"
+      - "cat_m"
+      - "Category M"
+    cat_s:
+      - "小分類"
+      - "小分類名"
+      - "cat_s"
+      - "Category S"
+    gross_sales_ex_tax:
+      - "粗売上"
+      - "粗売上金額"
+      - "売上金額(税抜)"
+      - "gross_sales"
+      - "Gross Sales"
+    qty:
+      - "売上点数"
+      - "数量"
+      - "qty"
+      - "Qty"
+      - "販売数量"
+  required:
+    - date
+    - store_id
+    - sku
+    - gross_sales_ex_tax
+  date_columns:
+    - date
+  numeric_columns:
+    - gross_sales_ex_tax
+    - qty
+
+sales_store_daily:
+  description: "日別・店舗別売上"
+  target_table: "raw_sales_store_daily"
+  stg_table: "f_sales_store_daily"
+  columns:
+    date:
+      - "日付"
+      - "date"
+      - "売上日"
+      - "Date"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+      - "StoreCode"
+    store_name:
+      - "店舗名"
+      - "store_name"
+      - "Store Name"
+    gross_sales_ex_tax:
+      - "粗売上"
+      - "粗売上金額"
+      - "売上金額(税抜)"
+      - "gross_sales"
+    net_sales_ex_tax:
+      - "実売上"
+      - "実売上金額"
+      - "純売上"
+      - "net_sales"
+    receipts:
+      - "レシート件数"
+      - "レシート数"
+      - "客数"
+      - "receipts"
+      - "Receipt Count"
+    qty:
+      - "売上点数"
+      - "数量"
+      - "qty"
+  required:
+    - date
+    - store_id
+    - gross_sales_ex_tax
+  date_columns:
+    - date
+  numeric_columns:
+    - gross_sales_ex_tax
+    - net_sales_ex_tax
+    - receipts
+    - qty
+
+receipt_line:
+  description: "レシート明細"
+  target_table: "raw_receipt_line"
+  stg_table: "f_receipt_line"
+  columns:
+    date:
+      - "日付"
+      - "date"
+      - "売上日"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+    receipt_id:
+      - "レシートNo"
+      - "レシート番号"
+      - "receipt_id"
+      - "Receipt ID"
+    line_no:
+      - "行番号"
+      - "明細行"
+      - "line_no"
+      - "Line No"
+    sku:
+      - "商品コード"
+      - "SKU"
+      - "sku"
+      - "JANコード"
+    product_name:
+      - "商品名"
+      - "品名"
+    qty:
+      - "数量"
+      - "売上点数"
+      - "qty"
+    unit_price_ex_tax:
+      - "単価(税抜)"
+      - "単価"
+      - "unit_price"
+    gross_amount_ex_tax:
+      - "粗金額"
+      - "粗売上金額"
+      - "gross_amount"
+    discount_amount_ex_tax:
+      - "値引額"
+      - "割引額"
+      - "discount"
+    net_amount_ex_tax:
+      - "実金額"
+      - "実売上金額"
+      - "net_amount"
+    time:
+      - "時刻"
+      - "時間"
+      - "time"
+    dept_name:
+      - "部門"
+      - "部門名"
+    cat_l:
+      - "大分類"
+    cat_m:
+      - "中分類"
+    cat_s:
+      - "小分類"
+  required:
+    - date
+    - store_id
+    - receipt_id
+  date_columns:
+    - date
+  numeric_columns:
+    - qty
+    - unit_price_ex_tax
+    - gross_amount_ex_tax
+    - discount_amount_ex_tax
+    - net_amount_ex_tax
+
+settlement:
+  description: "精算データ"
+  target_table: "raw_settlement"
+  stg_table: "f_settlement"
+  columns:
+    date:
+      - "日付"
+      - "date"
+      - "精算日"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+    receipt_id:
+      - "レシートNo"
+      - "レシート番号"
+      - "receipt_id"
+    tender_type:
+      - "決済方法"
+      - "支払方法"
+      - "tender_type"
+    amount:
+      - "金額"
+      - "精算金額"
+      - "amount"
+    is_refund_flag:
+      - "返品フラグ"
+      - "返品返金"
+      - "is_refund"
+      - "返品"
+    refund_reason_code:
+      - "返品理由"
+      - "理由コード"
+      - "refund_reason"
+    original_receipt_id:
+      - "元レシートNo"
+      - "original_receipt"
+  required:
+    - date
+    - store_id
+    - amount
+  date_columns:
+    - date
+  numeric_columns:
+    - amount
+
+sales_dept_timeband:
+  description: "日別・時間帯別・部門別売上"
+  target_table: "raw_sales_dept_timeband"
+  stg_table: "f_sales_dept_timeband_daily"
+  columns:
+    date:
+      - "日付"
+      - "date"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+    dept_name:
+      - "部門"
+      - "部門名"
+    time_start:
+      - "開始時刻"
+      - "時間帯(開始)"
+    time_end:
+      - "終了時刻"
+      - "時間帯(終了)"
+    timeband_label:
+      - "時間帯"
+      - "時間帯名"
+    gross_sales_ex_tax:
+      - "粗売上"
+      - "粗売上金額"
+      - "gross_sales"
+    qty:
+      - "売上点数"
+      - "数量"
+      - "qty"
+  required:
+    - date
+    - store_id
+    - dept_name
+    - gross_sales_ex_tax
+  date_columns:
+    - date
+  numeric_columns:
+    - gross_sales_ex_tax
+    - qty
+
+master_store:
+  description: "店舗マスタ"
+  target_table: "raw_master_store"
+  stg_table: "dim_store"
+  columns:
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+    store_name:
+      - "店舗名"
+      - "store_name"
+    open_date:
+      - "開店日"
+      - "open_date"
+    region:
+      - "地域"
+      - "エリア"
+      - "region"
+    timezone:
+      - "タイムゾーン"
+      - "timezone"
+  required:
+    - store_id
+    - store_name
+  date_columns:
+    - open_date
+  numeric_columns: []
+
+master_product:
+  description: "商品マスタ"
+  target_table: "raw_master_product"
+  stg_table: "dim_product"
+  columns:
+    sku:
+      - "商品コード"
+      - "SKU"
+      - "JANコード"
+      - "sku"
+    product_name:
+      - "商品名"
+      - "品名"
+    dept_name:
+      - "部門"
+      - "部門名"
+    cat_l:
+      - "大分類"
+    cat_m:
+      - "中分類"
+    cat_s:
+      - "小分類"
+    uom:
+      - "単位"
+      - "uom"
+    standard_cost:
+      - "原価"
+      - "標準原価"
+      - "仕入原価"
+      - "standard_cost"
+  required:
+    - sku
+    - product_name
+  date_columns: []
+  numeric_columns:
+    - standard_cost

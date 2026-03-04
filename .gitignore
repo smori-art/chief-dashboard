@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Data files (don't commit raw data)
+data/uploads/*
+data/temp/*
+!data/uploads/.gitkeep
+!data/temp/.gitkeep
+
+# PDF output
+output/*.pdf
+
+# Logs
+logs/*.log

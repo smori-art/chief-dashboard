@@ -1,0 +1,40 @@
+# Core
+streamlit>=1.32.0,<2.0
+pandas>=2.1.0,<3.0
+numpy>=1.26.0,<2.0
+plotly>=5.18.0,<6.0
+
+# BigQuery
+google-cloud-bigquery>=3.14.0,<4.0
+google-cloud-bigquery-storage>=2.24.0,<3.0
+google-cloud-storage>=2.14.0,<3.0
+db-dtypes>=1.2.0
+
+# Excel
+openpyxl>=3.1.0,<4.0
+xlrd>=2.0.0,<3.0
+
+# PDF
+weasyprint>=61.0,<63.0
+Jinja2>=3.1.0,<4.0
+
+# Teams / Microsoft Graph
+requests>=2.31.0,<3.0
+msal>=1.26.0,<2.0
+
+# Config
+python-dotenv>=1.0.0,<2.0
+PyYAML>=6.0.0,<7.0
+
+# Auth
+streamlit-authenticator>=0.3.0,<1.0
+PyJWT>=2.8.0,<3.0
+
+# Utilities
+hashlib-additional>=1.0.0;python_version<"3.0"
+loguru>=0.7.0,<1.0
+
+# Testing
+pytest>=7.4.0,<9.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
