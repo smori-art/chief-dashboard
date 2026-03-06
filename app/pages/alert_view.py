@@ -29,7 +29,7 @@ def _severity_badge(level: str) -> str:
 
 def render() -> None:
     """Render Alert Dashboard page."""
-    st.title("Alert Dashboard - アラート")
+    st.title("アラート")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)

@@ -24,7 +24,7 @@ from app.data import load_oos_data
 
 def render() -> None:
     """Render OOS Analysis page."""
-    st.title("OOS Analysis - 欠品分析")
+    st.title("欠品分析")
 
     filters = render_sidebar_filters()
     df = load_oos_data()

@@ -25,7 +25,7 @@ from app.data import load_daily_sales
 
 def render() -> None:
     """Render Daily Trend page."""
-    st.title("Daily Trend - 日別トレンド")
+    st.title("日次トレンド")
 
     filters = render_sidebar_filters()
     df = load_daily_sales()

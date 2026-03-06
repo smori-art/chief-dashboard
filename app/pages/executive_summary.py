@@ -28,7 +28,7 @@ from app.data import load_forecast, load_sales_monthly
 
 def render() -> None:
     """Render Executive Summary page."""
-    st.title("Executive Summary - 全社概況")
+    st.title("全社概況")
 
     filters = render_sidebar_filters()
     df = load_sales_monthly()
@@ -82,6 +82,26 @@ def render() -> None:
         if not fc_filtered.empty and fc_filtered["forecast_sales"].notna().any():
             forecast_total = fc_filtered["forecast_sales"].sum()
 
+    # Build sparkline data — monthly trend for last 6 months
+    df_trend_all = df[
+        (df["store_id"].isin(filters["store_ids"]))
+        & (df["dept_id"].isin(filters["dept_ids"]))
+    ]
+    spark_sales: list[float] | None = None
+    spark_profit: list[float] | None = None
+    spark_margin: list[float] | None = None
+    if not df_trend_all.empty:
+        _spark = df_trend_all.groupby("ym").agg({
+            sales_col: "sum",
+            "gross_profit": "sum",
+            "net_sales_ex_tax": "sum",
+        }).sort_index().tail(6)
+        if len(_spark) >= 2:
+            spark_sales = _spark[sales_col].tolist()
+            spark_profit = _spark["gross_profit"].tolist()
+            _m = (_spark["gross_profit"] / _spark["net_sales_ex_tax"] * 100).round(1)
+            spark_margin = _m.tolist()
+
     # Render KPI cards
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -92,9 +112,9 @@ def render() -> None:
             delta=yoy_sales,
             delta_suffix=" (前年差)",
             prefix="฿",
+            sparkline=spark_sales,
+            target=forecast_total,
         )
-        if forecast_total:
-            st.caption(f"着地見込み: ฿{forecast_total:,.0f}")
 
     with col2:
         render_kpi_card(
@@ -103,6 +123,7 @@ def render() -> None:
             delta=yoy_profit,
             delta_suffix=" (前年差)",
             prefix="฿",
+            sparkline=spark_profit,
         )
 
     with col3:
@@ -113,6 +134,7 @@ def render() -> None:
             delta_suffix="pt",
             suffix="%",
             fmt=".1f",
+            sparkline=spark_margin,
         )
 
     with col4:

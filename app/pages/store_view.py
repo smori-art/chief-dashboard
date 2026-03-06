@@ -24,7 +24,7 @@ from app.data import load_sales_monthly
 
 def render() -> None:
     """Render Store View page."""
-    st.title("Store View - 店舗分析")
+    st.title("店舗分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)

@@ -14,6 +14,8 @@ import pandas as pd
 import streamlit as st
 
 from app.components import (
+    ACCENT,
+    COLORS,
     COLORS_GRAY,
     _CHART_LAYOUT,
     chart_bar_composition,
@@ -28,7 +30,7 @@ from app.data import load_category_drilldown, load_sales_monthly
 
 def render() -> None:
     """Render Product Analysis page."""
-    st.title("Product Analysis - 商品別分析")
+    st.title("商品分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)
@@ -133,7 +135,7 @@ def render() -> None:
             x=product_ranked["cat_s"].head(20),
             y=product_ranked[sales_col].head(20),
             marker_color=[
-                "#444" if r == "A" else "#888" if r == "B" else "#ccc"
+                COLORS[0] if r == "A" else COLORS[3] if r == "B" else "#CBD5E1"
                 for r in product_ranked["ランク"].head(20)
             ],
             name="売上",
@@ -142,8 +144,8 @@ def render() -> None:
             x=product_ranked["cat_s"].head(20),
             y=product_ranked["売上累積比(%)"].head(20),
             mode="lines+markers",
-            marker=dict(color="#666", size=5),
-            line=dict(color="#666", width=2),
+            marker=dict(color=ACCENT, size=5),
+            line=dict(color=ACCENT, width=2),
             name="累積比(%)",
             yaxis="y2",
         ))

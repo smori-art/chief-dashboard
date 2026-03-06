@@ -30,7 +30,7 @@ from app.data import load_waste_data
 
 def render() -> None:
     """Render Waste/Loss Analysis page."""
-    st.title("Waste Analysis - ロス・廃棄分析")
+    st.title("ロス・廃棄分析")
 
     filters = render_sidebar_filters()
     df = load_waste_data()

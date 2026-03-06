@@ -25,7 +25,7 @@ from app.data import load_timeband_data
 
 def render() -> None:
     """Render Timeband Analysis page."""
-    st.title("Timeband Analysis - 時間帯別分析")
+    st.title("時間帯分析")
 
     filters = render_sidebar_filters()
     df = load_timeband_data()

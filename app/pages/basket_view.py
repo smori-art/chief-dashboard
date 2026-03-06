@@ -26,7 +26,7 @@ from app.data import load_basket_data
 
 def render() -> None:
     """Render Basket Analysis page."""
-    st.title("Basket Analysis - 併買分析")
+    st.title("買物かご分析")
 
     filters = render_sidebar_filters()
     df = load_basket_data()

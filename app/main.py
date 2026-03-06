@@ -14,56 +14,98 @@ from app.config import get_config
 
 _MINIMAL_CSS = """
 <style>
-    /* --- Gray Minimal Theme --- */
+    /* ===== Cool Minimal Theme ===== */
+    :root {
+        --accent: #2563EB;
+        --accent-light: #DBEAFE;
+        --text-primary: #0F172A;
+        --text-secondary: #64748B;
+        --border: #E2E8F0;
+        --surface: #F8FAFC;
+        --positive: #16A34A;
+        --negative: #DC2626;
+    }
+
+    /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #f0f0f1;
-        border-right: 1px solid #ddd;
+        background: #FAFBFD;
+        border-right: 1px solid var(--border);
     }
     section[data-testid="stSidebar"] .stRadio label {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
+
     /* KPI metric cards */
     div[data-testid="stMetric"] {
         background: #ffffff;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 18px;
+        transition: box-shadow 0.15s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     div[data-testid="stMetric"] label {
-        color: #666 !important;
-        font-size: 0.78rem !important;
+        color: var(--text-secondary) !important;
+        font-size: 0.72rem !important;
+        font-weight: 500 !important;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
     }
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
-        font-weight: 600;
-        color: #1a1a1a !important;
+        font-size: 1.45rem !important;
+        font-weight: 700;
+        color: var(--text-primary) !important;
     }
-    /* Subdued dividers */
+    /* Delta colors */
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Up"] {
+        fill: var(--positive);
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Down"] {
+        fill: var(--negative);
+    }
+
+    /* Dividers */
     hr {
-        border-color: #e5e5e5 !important;
+        border-color: var(--border) !important;
     }
-    /* Table styling */
+
+    /* Tables */
     .stDataFrame {
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
     }
+
     /* Page title */
     h1 {
         font-weight: 700 !important;
-        font-size: 1.6rem !important;
-        color: #222 !important;
-        border-bottom: 2px solid #ddd;
+        font-size: 1.5rem !important;
+        color: var(--text-primary) !important;
+        border-bottom: 2px solid var(--accent);
         padding-bottom: 0.4rem;
     }
     h2, h3 {
-        color: #333 !important;
+        color: var(--text-primary) !important;
         font-weight: 600 !important;
     }
-    /* Subtle subheaders */
-    .stSubheader {
-        color: #444 !important;
+
+    /* Expander in sidebar — compact */
+    section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    /* Navigation labels */
+    .nav-category {
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        padding: 12px 0 4px 0;
+        margin: 0;
     }
 </style>
 """
@@ -93,29 +135,7 @@ def main() -> None:
     # Show user info in sidebar
     show_user_info_sidebar()
 
-    # Navigation
-    _PAGES = [
-        "--- 概況 ---",
-        "Executive Summary",
-        "Alert Dashboard",
-        "--- 切口分析 ---",
-        "Department View",
-        "Store View",
-        "Store x Department",
-        "Product Analysis",
-        "--- 深掘り ---",
-        "Timeband Analysis",
-        "Daily Trend",
-        "Basket Analysis",
-        "Discount Analysis",
-        "Waste Analysis",
-        "Budget vs Actual",
-        "OOS Analysis",
-        "--- 管理 ---",
-        "Import / Admin",
-        "Export / Report",
-    ]
-
+    # Navigation — grouped by category
     _PAGE_MAP = {
         "Executive Summary": "app.pages.executive_summary",
         "Alert Dashboard": "app.pages.alert_view",
@@ -134,18 +154,63 @@ def main() -> None:
         "Export / Report": "app.pages.export_report",
     }
 
+    _NAV_GROUPS: list[tuple[str, list[str]]] = [
+        ("概況", ["Executive Summary", "Alert Dashboard"]),
+        ("切口分析", ["Department View", "Store View", "Store x Department", "Product Analysis"]),
+        ("深掘り", ["Timeband Analysis", "Daily Trend", "Basket Analysis",
+                   "Discount Analysis", "Waste Analysis", "Budget vs Actual", "OOS Analysis"]),
+        ("管理", ["Import / Admin", "Export / Report"]),
+    ]
+
+    # Japanese display names for pages
+    _PAGE_LABELS = {
+        "Executive Summary": "全社概況",
+        "Alert Dashboard": "アラート",
+        "Department View": "部門分析",
+        "Store View": "店舗分析",
+        "Store x Department": "店舗×部門",
+        "Product Analysis": "商品分析",
+        "Timeband Analysis": "時間帯分析",
+        "Daily Trend": "日次トレンド",
+        "Basket Analysis": "買物かご分析",
+        "Discount Analysis": "値引分析",
+        "Waste Analysis": "ロス分析",
+        "Budget vs Actual": "予実管理",
+        "OOS Analysis": "欠品分析",
+        "Import / Admin": "インポート",
+        "Export / Report": "レポート出力",
+    }
+
     with st.sidebar:
         st.divider()
-        page = st.radio(
-            "ページ選択",
-            options=_PAGES,
-            format_func=lambda x: x if not x.startswith("---") else x.replace("---", "").strip(),
-            key="nav_page",
-        )
+        # Build flat list for the radio, but render category headers
+        all_pages: list[str] = []
+        for _group_label, pages in _NAV_GROUPS:
+            all_pages.extend(pages)
 
-    # Skip section headers
-    if page.startswith("---"):
-        page = "Executive Summary"
+        # Default to first page
+        if "nav_page" not in st.session_state:
+            st.session_state["nav_page"] = "Executive Summary"
+
+        # Render grouped navigation
+        for group_label, pages in _NAV_GROUPS:
+            st.markdown(
+                f'<p class="nav-category">{group_label}</p>',
+                unsafe_allow_html=True,
+            )
+            for p in pages:
+                label = _PAGE_LABELS.get(p, p)
+                is_active = st.session_state.get("nav_page") == p
+                if st.button(
+                    f"{'● ' if is_active else ''}{label}",
+                    key=f"nav_{p}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary",
+                ):
+                    st.session_state["nav_page"] = p
+                    st.rerun()
+
+    page = st.session_state.get("nav_page", "Executive Summary")
 
     import importlib
     module = importlib.import_module(_PAGE_MAP[page])

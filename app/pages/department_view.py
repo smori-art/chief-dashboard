@@ -26,7 +26,7 @@ from app.data import load_category_drilldown, load_sales_monthly
 
 def render() -> None:
     """Render Department View page."""
-    st.title("Department View - 部門分析")
+    st.title("部門分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)

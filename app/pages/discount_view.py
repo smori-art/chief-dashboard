@@ -26,7 +26,7 @@ from app.data import load_discount_detail
 
 def render() -> None:
     """Render Discount Analysis page."""
-    st.title("Discount Analysis - 値引分析")
+    st.title("値引分析")
 
     filters = render_sidebar_filters()
     df = load_discount_detail()

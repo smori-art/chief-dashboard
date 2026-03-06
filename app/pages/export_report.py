@@ -19,7 +19,7 @@ from app.teams_sender import send_teams_message
 
 def render() -> None:
     """Render Export / Report page."""
-    st.title("Export / Report - レポート出力")
+    st.title("レポート出力")
 
     user = require_auth()
     if user is None:

@@ -26,7 +26,7 @@ from app.data import load_budget_data, load_forecast, load_sales_monthly
 
 def render() -> None:
     """Render Budget vs Actual page."""
-    st.title("Budget vs Actual - 予実対比")
+    st.title("予実管理")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)

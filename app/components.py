@@ -13,67 +13,91 @@ import streamlit as st
 
 from app.data import get_department_list, get_store_list, get_ym_list
 
-# Gray-based minimal color palette
-COLORS_GRAY = [
-    "#4a4a4a", "#7a7a7a", "#9e9e9e", "#b0b0b0", "#c8c8c8", "#d9d9d9",
+# ---------------------------------------------------------------------------
+# Design tokens — cool minimal palette with blue accent
+# ---------------------------------------------------------------------------
+ACCENT = "#2563EB"          # primary blue
+ACCENT_LIGHT = "#DBEAFE"    # blue-50
+TEXT_PRIMARY = "#0F172A"     # slate-900
+TEXT_SECONDARY = "#64748B"   # slate-500
+BORDER = "#E2E8F0"          # slate-200
+SURFACE = "#F8FAFC"         # slate-50
+
+POSITIVE = "#16A34A"        # green-600
+NEGATIVE = "#DC2626"        # red-600
+POSITIVE_BG = "#F0FDF4"     # green-50
+NEGATIVE_BG = "#FEF2F2"     # red-50
+NEUTRAL_BG = "#F8FAFC"      # slate-50
+
+# Chart color palette — distinguishable, cool tones
+COLORS = [
+    "#2563EB",  # blue
+    "#7C3AED",  # violet
+    "#0891B2",  # cyan
+    "#059669",  # emerald
+    "#D97706",  # amber
+    "#E11D48",  # rose
 ]
+
+# Keep backward-compatible alias
+COLORS_GRAY = COLORS
 
 _CHART_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#333", size=12),
-    title_font=dict(size=14, color="#333"),
+    font=dict(family="Inter, -apple-system, sans-serif", color=TEXT_PRIMARY, size=12),
+    title_font=dict(size=13, color=TEXT_SECONDARY, family="Inter, -apple-system, sans-serif"),
     margin=dict(l=10, r=10, t=40, b=10),
+    hoverlabel=dict(bgcolor="white", font_size=12, bordercolor=BORDER),
 )
 
 
 def render_sidebar_filters() -> dict[str, Any]:
     """
     Render common sidebar filters and return selected values.
-    Used across all dashboard pages.
+    Uses a compact expander to keep the sidebar clean.
     """
     with st.sidebar:
-        st.header("フィルタ")
-
-        # Period
+        # Period — always visible (most-used filter)
         ym_list = get_ym_list()
         selected_ym = st.selectbox(
-            "期間（年月）",
+            "期間",
             options=ym_list,
             index=0,
             key="filter_ym",
         )
 
-        # Stores
-        stores = get_store_list()
-        store_options = {f"{sid} - {sname}": sid for sid, sname in stores}
-        selected_stores_labels = st.multiselect(
-            "店舗",
-            options=list(store_options.keys()),
-            default=list(store_options.keys()),
-            key="filter_stores",
-        )
-        selected_store_ids = [store_options[s] for s in selected_stores_labels]
-
-        # Departments
-        depts = get_department_list()
-        dept_options = {f"{dname}": did for did, dname in depts}
-        selected_dept_labels = st.multiselect(
-            "部門",
-            options=list(dept_options.keys()),
-            default=list(dept_options.keys()),
-            key="filter_depts",
-        )
-        selected_dept_ids = [dept_options[d] for d in selected_dept_labels]
-
-        # Sales type toggle
+        # Sales type toggle — compact pills
         sales_type = st.radio(
-            "売上表示",
+            "売上種別",
             options=["実売上 (Net)", "粗売上 (Gross)"],
             index=0,
             key="filter_sales_type",
             horizontal=True,
         )
+
+        # Stores & Departments inside collapsible section
+        with st.expander("店舗・部門を絞り込む", expanded=False):
+            stores = get_store_list()
+            store_options = {f"{sid} - {sname}": sid for sid, sname in stores}
+            selected_stores_labels = st.multiselect(
+                "店舗",
+                options=list(store_options.keys()),
+                default=list(store_options.keys()),
+                key="filter_stores",
+            )
+
+            depts = get_department_list()
+            dept_options = {f"{dname}": did for did, dname in depts}
+            selected_dept_labels = st.multiselect(
+                "部門",
+                options=list(dept_options.keys()),
+                default=list(dept_options.keys()),
+                key="filter_depts",
+            )
+
+        selected_store_ids = [store_options[s] for s in selected_stores_labels]
+        selected_dept_ids = [dept_options[d] for d in selected_dept_labels]
 
         st.divider()
 
@@ -118,8 +142,15 @@ def render_kpi_card(
     prefix: str = "",
     suffix: str = "",
     fmt: str = ",.0f",
+    sparkline: list[float] | None = None,
+    target: float | None = None,
 ) -> None:
-    """Render a KPI metric card."""
+    """Render an enhanced KPI metric card with optional sparkline & progress bar.
+
+    Args:
+        sparkline: list of recent values to draw as an inline sparkline SVG.
+        target: target value; if provided, shows a small progress bar.
+    """
     if isinstance(value, (int, float)):
         formatted_value = f"{prefix}{value:{fmt}}{suffix}"
     else:
@@ -130,6 +161,52 @@ def render_kpi_card(
         st.metric(label=label, value=formatted_value, delta=delta_str)
     else:
         st.metric(label=label, value=formatted_value)
+
+    # --- Optional sparkline (inline SVG) ---
+    if sparkline and len(sparkline) >= 2:
+        _render_sparkline(sparkline)
+
+    # --- Optional target progress bar ---
+    if target is not None and isinstance(value, (int, float)) and target > 0:
+        pct = min(value / target, 1.5)
+        bar_color = POSITIVE if pct >= 1.0 else ACCENT if pct >= 0.9 else NEGATIVE
+        st.markdown(
+            f'<div style="margin-top:4px">'
+            f'<div style="background:{BORDER};border-radius:3px;height:5px;width:100%">'
+            f'<div style="background:{bar_color};border-radius:3px;height:5px;'
+            f'width:{min(pct * 100, 100):.0f}%"></div></div>'
+            f'<span style="font-size:0.7rem;color:{TEXT_SECONDARY}">'
+            f'達成率 {pct * 100:.0f}%</span></div>',
+            unsafe_allow_html=True,
+        )
+
+
+def _render_sparkline(data: list[float], width: int = 100, height: int = 24) -> None:
+    """Draw a tiny sparkline SVG inside the KPI card."""
+    n = len(data)
+    mn, mx = min(data), max(data)
+    rng = mx - mn if mx != mn else 1
+    padding = 2
+    usable_w = width - padding * 2
+    usable_h = height - padding * 2
+
+    points = []
+    for i, v in enumerate(data):
+        x = padding + (i / (n - 1)) * usable_w
+        y = padding + usable_h - ((v - mn) / rng) * usable_h
+        points.append(f"{x:.1f},{y:.1f}")
+
+    trend_color = POSITIVE if data[-1] >= data[0] else NEGATIVE
+    polyline = " ".join(points)
+    svg = (
+        f'<svg width="{width}" height="{height}" style="display:block;margin-top:2px">'
+        f'<polyline points="{polyline}" fill="none" stroke="{trend_color}" '
+        f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'<circle cx="{points[-1].split(",")[0]}" cy="{points[-1].split(",")[1]}" '
+        f'r="2" fill="{trend_color}"/>'
+        f'</svg>'
+    )
+    st.markdown(svg, unsafe_allow_html=True)
 
 
 def render_kpi_row(kpis: list[dict[str, Any]], cols: int = 4) -> None:
@@ -214,10 +291,10 @@ def chart_waterfall(
         textposition="outside",
         text=[f"{v:+,.0f}" if i > 0 else f"{v:,.0f}"
               for i, v in enumerate(values)],
-        connector={"line": {"color": "#999"}},
-        increasing={"marker": {"color": "#666"}},
-        decreasing={"marker": {"color": "#aaa"}},
-        totals={"marker": {"color": "#444"}},
+        connector={"line": {"color": BORDER}},
+        increasing={"marker": {"color": POSITIVE}},
+        decreasing={"marker": {"color": NEGATIVE}},
+        totals={"marker": {"color": ACCENT}},
     ))
     fig.update_layout(
         title=title,

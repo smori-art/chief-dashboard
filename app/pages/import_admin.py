@@ -34,7 +34,7 @@ SOURCE_TYPE_OPTIONS: dict[str, str] = {
 
 def render() -> None:
     """Render Import / Admin page."""
-    st.title("Import / Admin - データ取込管理")
+    st.title("インポート")
 
     user = require_auth()
     if user is None:

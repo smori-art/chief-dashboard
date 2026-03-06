@@ -56,8 +56,13 @@ class SimpleAuthProvider(AuthProvider):
         if "authenticated_user" in st.session_state:
             return st.session_state["authenticated_user"]
 
-        st.markdown("## ログイン")
-        st.markdown("Chief Dashboard にアクセスするにはログインが必要です。")
+        st.markdown(
+            '<div style="text-align:center;padding:2rem 0 1rem">'
+            '<h2 style="font-weight:700;color:#0F172A;margin:0">Chief Dashboard</h2>'
+            '<p style="color:#64748B;font-size:0.9rem;margin-top:4px">'
+            'タイ食品スーパー 月次ダッシュボード</p></div>',
+            unsafe_allow_html=True,
+        )
 
         with st.form("login_form"):
             username = st.text_input("ユーザー名", key="login_username")

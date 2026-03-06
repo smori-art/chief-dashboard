@@ -23,7 +23,7 @@ from app.data import load_sales_monthly
 
 def render() -> None:
     """Render Store × Department page."""
-    st.title("Store x Department - 店舗x部門分析")
+    st.title("店舗×部門")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)
