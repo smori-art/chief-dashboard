@@ -26,7 +26,7 @@ from app.data import load_category_drilldown, load_sales_monthly
 
 def render() -> None:
     """Render Department View page."""
-    st.title("🏢 Department View - 部門分析")
+    st.title("Department View - 部門分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)
@@ -63,7 +63,7 @@ def render() -> None:
     df_cat_dept = df_cat_f[df_cat_f["dept_id"] == dept_id] if not df_cat_f.empty else pd.DataFrame()
 
     # --- Department KPIs ---
-    st.subheader(f"📊 {selected_dept} - KPI")
+    st.subheader(f"{selected_dept} - KPI")
 
     dept_totals = df_dept.agg({
         "gross_sales_ex_tax": "sum",
@@ -95,7 +95,7 @@ def render() -> None:
     st.divider()
 
     # --- Category Drilldown ---
-    st.subheader("📂 カテゴリ別ドリルダウン")
+    st.subheader("カテゴリ別ドリルダウン")
 
     if df_cat_dept.empty:
         st.info("カテゴリデータがありません。")
@@ -156,7 +156,7 @@ def render() -> None:
     st.divider()
 
     # --- Rankings ---
-    st.subheader("🏆 ランキング")
+    st.subheader("ランキング")
 
     if not df_cat_dept.empty:
         col_r1, col_r2 = st.columns(2)

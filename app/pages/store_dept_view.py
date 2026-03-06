@@ -23,7 +23,7 @@ from app.data import load_sales_monthly
 
 def render() -> None:
     """Render Store × Department page."""
-    st.title("🔀 Store × Department - 店舗×部門分析")
+    st.title("Store x Department - 店舗x部門分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)
@@ -35,7 +35,7 @@ def render() -> None:
         return
 
     # --- Heatmap ---
-    st.subheader("🗺️ ヒートマップ")
+    st.subheader("ヒートマップ")
 
     heatmap_metric = st.radio(
         "表示指標",
@@ -78,7 +78,7 @@ def render() -> None:
     st.divider()
 
     # --- Problem Area Detection ---
-    st.subheader("⚠️ 問題箇所の検出")
+    st.subheader("問題箇所の検出")
 
     # Margin deterioration: YoY diff < -2pt
     st.markdown("**粗利率悪化 (前年比 -2pt以上)**")
@@ -122,7 +122,7 @@ def render() -> None:
     st.divider()
 
     # --- Cross Comparison Table ---
-    st.subheader("📋 クロス集計テーブル")
+    st.subheader("クロス集計テーブル")
 
     pivot_metric = st.selectbox(
         "指標",

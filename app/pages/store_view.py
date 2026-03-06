@@ -24,7 +24,7 @@ from app.data import load_sales_monthly
 
 def render() -> None:
     """Render Store View page."""
-    st.title("🏪 Store View - 店舗分析")
+    st.title("Store View - 店舗分析")
 
     filters = render_sidebar_filters()
     sales_col = get_sales_column(filters)
@@ -37,7 +37,7 @@ def render() -> None:
         return
 
     # --- Store KPI Comparison Table ---
-    st.subheader("📊 店舗別KPI比較")
+    st.subheader("店舗別KPI比較")
 
     store_agg = df_filtered.groupby(["store_id", "store_name"]).agg({
         "gross_sales_ex_tax": "sum",
@@ -86,7 +86,7 @@ def render() -> None:
     st.divider()
 
     # --- Best/Worst Rankings ---
-    st.subheader("🏆 ベスト / ワースト")
+    st.subheader("ベスト / ワースト")
 
     col_best, col_worst = st.columns(2)
 
@@ -119,7 +119,7 @@ def render() -> None:
     st.divider()
 
     # --- Store Trend Comparison ---
-    st.subheader("📈 店舗別月次推移")
+    st.subheader("店舗別月次推移")
 
     # Get full time-range data
     df_trend = df[

@@ -13,6 +13,19 @@ import streamlit as st
 
 from app.data import get_department_list, get_store_list, get_ym_list
 
+# Gray-based minimal color palette
+COLORS_GRAY = [
+    "#4a4a4a", "#7a7a7a", "#9e9e9e", "#b0b0b0", "#c8c8c8", "#d9d9d9",
+]
+
+_CHART_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(color="#333", size=12),
+    title_font=dict(size=14, color="#333"),
+    margin=dict(l=10, r=10, t=40, b=10),
+)
+
 
 def render_sidebar_filters() -> dict[str, Any]:
     """
@@ -144,12 +157,13 @@ def chart_bar_composition(
         color=color_col,
         title=title,
         text=value_col,
+        color_discrete_sequence=COLORS_GRAY,
     )
     fig.update_traces(texttemplate="%{text:,.0f}", textposition="outside")
     fig.update_layout(
         height=max(300, len(df) * 35),
         showlegend=False,
-        margin=dict(l=10, r=10, t=40, b=10),
+        **_CHART_LAYOUT,
     )
     return fig
 
@@ -170,12 +184,13 @@ def chart_line_trend(
         color=color_col,
         title=title,
         markers=True,
+        color_discrete_sequence=COLORS_GRAY,
     )
     fig.update_layout(
         xaxis_title="",
         yaxis_title=y_title,
         height=400,
-        margin=dict(l=10, r=10, t=40, b=10),
+        **_CHART_LAYOUT,
     )
     return fig
 
@@ -199,13 +214,16 @@ def chart_waterfall(
         textposition="outside",
         text=[f"{v:+,.0f}" if i > 0 else f"{v:,.0f}"
               for i, v in enumerate(values)],
-        connector={"line": {"color": "rgb(63, 63, 63)"}},
+        connector={"line": {"color": "#999"}},
+        increasing={"marker": {"color": "#666"}},
+        decreasing={"marker": {"color": "#aaa"}},
+        totals={"marker": {"color": "#444"}},
     ))
     fig.update_layout(
         title=title,
         height=400,
         showlegend=False,
-        margin=dict(l=10, r=10, t=40, b=10),
+        **_CHART_LAYOUT,
     )
     return fig
 
@@ -233,7 +251,7 @@ def chart_heatmap(
     fig.update_layout(
         title=title,
         height=max(300, len(pivot) * 40),
-        margin=dict(l=10, r=10, t=40, b=10),
+        **_CHART_LAYOUT,
     )
     return fig
 

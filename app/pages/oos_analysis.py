@@ -24,7 +24,7 @@ from app.data import load_oos_data
 
 def render() -> None:
     """Render OOS Analysis page."""
-    st.title("🚫 OOS Analysis - 欠品分析")
+    st.title("OOS Analysis - 欠品分析")
 
     filters = render_sidebar_filters()
     df = load_oos_data()
@@ -45,7 +45,7 @@ def render() -> None:
         return
 
     # --- OOS Summary ---
-    st.subheader("📊 欠品率サマリ")
+    st.subheader("欠品率サマリ")
 
     total_skus = df_filtered.groupby(["date", "store_id"])["sku"].nunique().mean()
     oos_skus = df_filtered[df_filtered["is_oos_suspect"]].groupby(["date", "store_id"])["sku"].nunique().mean()
@@ -82,7 +82,7 @@ def render() -> None:
     st.divider()
 
     # --- OOS by Department ---
-    st.subheader("🏢 部門別欠品率")
+    st.subheader("部門別欠品率")
 
     dept_oos = df_filtered.groupby("dept_id").agg(
         total_records=("sku", "count"),
@@ -104,7 +104,7 @@ def render() -> None:
     st.divider()
 
     # --- Suspected OOS SKU List ---
-    st.subheader("📋 欠品疑いSKUリスト")
+    st.subheader("欠品疑いSKUリスト")
 
     oos_skus_df = df_filtered[df_filtered["is_oos_suspect"]].copy()
 
@@ -136,7 +136,7 @@ def render() -> None:
     st.divider()
 
     # --- DOW × Store Heatmap ---
-    st.subheader("📅 曜日別欠品パターン")
+    st.subheader("曜日別欠品パターン")
 
     dow_names = {1: "月", 2: "火", 3: "水", 4: "木", 5: "金", 6: "土", 7: "日"}
 
@@ -162,7 +162,7 @@ def render() -> None:
     st.divider()
 
     # --- Comparison note ---
-    st.subheader("📊 レシート推定 vs 在庫データ 比較")
+    st.subheader("レシート推定 vs 在庫データ 比較")
     st.info(
         "現在はレシート推定による欠品率のみ表示しています。\n\n"
         "在庫・発注データが連携されると、以下の比較分析が可能になります：\n"

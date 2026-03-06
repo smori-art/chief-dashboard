@@ -28,7 +28,7 @@ from app.data import load_forecast, load_sales_monthly
 
 def render() -> None:
     """Render Executive Summary page."""
-    st.title("📊 Executive Summary - 全社概況")
+    st.title("Executive Summary - 全社概況")
 
     filters = render_sidebar_filters()
     df = load_sales_monthly()
@@ -41,7 +41,7 @@ def render() -> None:
     sales_col = get_sales_column(filters)
 
     # --- KPI Cards ---
-    st.subheader(f"📈 月次KPI ({filters['ym']})")
+    st.subheader(f"月次KPI ({filters['ym']})")
 
     # Aggregate across selected stores and departments
     total = df_filtered.agg({
@@ -153,7 +153,7 @@ def render() -> None:
     st.divider()
 
     # --- Department Composition ---
-    st.subheader("🏢 部門別構成比")
+    st.subheader("部門別構成比")
 
     dept_agg = df_filtered.groupby("dept_name").agg({
         sales_col: "sum",
@@ -197,7 +197,7 @@ def render() -> None:
     st.divider()
 
     # --- Trend Charts ---
-    st.subheader("📈 月次推移")
+    st.subheader("月次推移")
 
     # Get full time range data (not filtered by ym)
     df_trend = df[
@@ -240,7 +240,7 @@ def render() -> None:
     st.divider()
 
     # --- Gross Profit Factor Decomposition ---
-    st.subheader("🔍 粗利変動要因分析")
+    st.subheader("粗利変動要因分析")
     st.caption("粗利の前年差を売価要因・数量要因・値引要因に近似分解")
 
     # Simplified factor decomposition
