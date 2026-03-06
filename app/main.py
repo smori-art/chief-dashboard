@@ -15,21 +15,11 @@ from app.config import get_config
 _MINIMAL_CSS = """
 <style>
     /* ===== Cool Minimal Theme ===== */
-    :root {
-        --accent: #2563EB;
-        --accent-light: #DBEAFE;
-        --text-primary: #0F172A;
-        --text-secondary: #64748B;
-        --border: #E2E8F0;
-        --surface: #F8FAFC;
-        --positive: #16A34A;
-        --negative: #DC2626;
-    }
 
     /* Sidebar */
     section[data-testid="stSidebar"] {
-        background: #FAFBFD;
-        border-right: 1px solid var(--border);
+        background: #F8FAFC !important;
+        border-right: 1px solid #E2E8F0 !important;
     }
     section[data-testid="stSidebar"] .stRadio label {
         font-size: 0.85rem;
@@ -37,75 +27,105 @@ _MINIMAL_CSS = """
 
     /* KPI metric cards */
     div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 14px 18px;
-        transition: box-shadow 0.15s ease;
+        background: #ffffff !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 10px !important;
+        padding: 16px 20px !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+        transition: box-shadow 0.15s ease, transform 0.15s ease !important;
     }
     div[data-testid="stMetric"]:hover {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        transform: translateY(-1px);
     }
     div[data-testid="stMetric"] label {
-        color: var(--text-secondary) !important;
-        font-size: 0.72rem !important;
-        font-weight: 500 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        color: #64748B !important;
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
     }
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-        font-size: 1.45rem !important;
-        font-weight: 700;
-        color: var(--text-primary) !important;
-    }
-    /* Delta colors */
-    div[data-testid="stMetric"] [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Up"] {
-        fill: var(--positive);
-    }
-    div[data-testid="stMetric"] [data-testid="stMetricDelta"] svg[data-testid="stMetricDeltaIcon-Down"] {
-        fill: var(--negative);
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #0F172A !important;
     }
 
     /* Dividers */
     hr {
-        border-color: var(--border) !important;
+        border-color: #E2E8F0 !important;
     }
 
     /* Tables */
     .stDataFrame {
-        border: 1px solid var(--border);
-        border-radius: 6px;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
     }
 
     /* Page title */
     h1 {
         font-weight: 700 !important;
         font-size: 1.5rem !important;
-        color: var(--text-primary) !important;
-        border-bottom: 2px solid var(--accent);
-        padding-bottom: 0.4rem;
+        color: #0F172A !important;
+        border-bottom: 2px solid #2563EB !important;
+        padding-bottom: 0.5rem !important;
     }
-    h2, h3 {
-        color: var(--text-primary) !important;
+    h2 {
+        color: #0F172A !important;
+        font-weight: 600 !important;
+        font-size: 1.1rem !important;
+    }
+    h3 {
+        color: #334155 !important;
         font-weight: 600 !important;
     }
 
-    /* Expander in sidebar — compact */
-    section[data-testid="stSidebar"] .streamlit-expanderHeader {
-        font-size: 0.8rem;
-        font-weight: 500;
-        color: var(--text-secondary);
+    /* Sidebar expander */
+    section[data-testid="stSidebar"] details summary {
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        color: #64748B !important;
     }
 
-    /* Navigation labels */
+    /* Sidebar nav buttons — override Streamlit defaults */
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] {
+        background: transparent !important;
+        border: none !important;
+        color: #334155 !important;
+        font-size: 0.84rem !important;
+        font-weight: 400 !important;
+        text-align: left !important;
+        padding: 4px 12px !important;
+        border-radius: 6px !important;
+        justify-content: flex-start !important;
+        transition: background 0.1s ease !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"]:hover {
+        background: #F1F5F9 !important;
+        color: #0F172A !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
+        background: #EFF6FF !important;
+        border: none !important;
+        border-left: 3px solid #2563EB !important;
+        color: #2563EB !important;
+        font-size: 0.84rem !important;
+        font-weight: 600 !important;
+        text-align: left !important;
+        padding: 4px 12px !important;
+        border-radius: 0 6px 6px 0 !important;
+        justify-content: flex-start !important;
+    }
+
+    /* Nav category labels */
     .nav-category {
-        font-size: 0.65rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-secondary);
-        padding: 12px 0 4px 0;
-        margin: 0;
+        font-size: 0.62rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        color: #94A3B8 !important;
+        padding: 14px 0 2px 4px !important;
+        margin: 0 !important;
     }
 </style>
 """
@@ -202,7 +222,7 @@ def main() -> None:
                 label = _PAGE_LABELS.get(p, p)
                 is_active = st.session_state.get("nav_page") == p
                 if st.button(
-                    f"{'● ' if is_active else ''}{label}",
+                    label,
                     key=f"nav_{p}",
                     use_container_width=True,
                     type="primary" if is_active else "secondary",
