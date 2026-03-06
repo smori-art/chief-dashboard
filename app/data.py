@@ -418,6 +418,214 @@ def load_forecast() -> pd.DataFrame:
     return _generate_demo_forecast()
 
 
+def _generate_demo_timeband_data() -> pd.DataFrame:
+    """Generate demo time-band sales data (hourly by department)."""
+    np.random.seed(700)
+    stores = ["S001", "S002", "S003", "S004"]
+    depts = ["food", "produce", "seafood", "meat", "deli"]
+    dept_names = {"food": "食品", "produce": "青果", "seafood": "鮮魚", "meat": "精肉", "deli": "惣菜"}
+    timebands = [
+        ("09-10", 0.5), ("10-11", 0.8), ("11-12", 1.2), ("12-13", 1.0),
+        ("13-14", 0.7), ("14-15", 0.6), ("15-16", 0.9), ("16-17", 1.3),
+        ("17-18", 1.5), ("18-19", 1.4), ("19-20", 1.0), ("20-21", 0.6),
+    ]
+    today = date.today()
+    dates = [today - timedelta(days=i) for i in range(30)]
+
+    rows = []
+    for d in dates:
+        for store_id in stores:
+            for dept_id in depts:
+                for tb, weight in timebands:
+                    # Deli peaks in evening
+                    dept_weight = 1.8 if dept_id == "deli" and tb >= "17" else 1.0
+                    base = np.random.uniform(20_000, 200_000) * weight * dept_weight
+                    rows.append({
+                        "date": d,
+                        "store_id": store_id,
+                        "dept_id": dept_id,
+                        "dept_name": dept_names[dept_id],
+                        "timeband": tb,
+                        "net_sales": round(base, 2),
+                        "qty": int(base / np.random.uniform(50, 150)),
+                        "receipts": int(np.random.uniform(10, 200) * weight),
+                        "dow": d.weekday() + 1,
+                    })
+    return pd.DataFrame(rows)
+
+
+def _generate_demo_basket_data() -> pd.DataFrame:
+    """Generate demo basket (co-purchase) data."""
+    np.random.seed(800)
+    products = [
+        ("醤油", "food"), ("味噌", "food"), ("緑茶", "food"), ("コーラ", "food"),
+        ("ポテトチップス", "food"), ("レタス", "produce"), ("にんじん", "produce"),
+        ("マグロ", "seafood"), ("鯛", "seafood"), ("ロース", "meat"),
+        ("もも肉", "meat"), ("幕の内", "deli"), ("コロッケ", "deli"),
+        ("板チョコ", "food"), ("オレンジ", "produce"), ("アサリ", "seafood"),
+    ]
+    stores = ["S001", "S002", "S003", "S004"]
+    today = date.today()
+
+    rows = []
+    receipt_id = 1000
+    for day_offset in range(30):
+        d = today - timedelta(days=day_offset)
+        for store_id in stores:
+            n_receipts = np.random.randint(50, 200)
+            for _ in range(n_receipts):
+                receipt_id += 1
+                n_items = np.random.randint(2, 8)
+                basket = np.random.choice(len(products), size=min(n_items, len(products)), replace=False)
+                for idx in basket:
+                    name, dept = products[idx]
+                    price = np.random.uniform(30, 500)
+                    qty = np.random.randint(1, 5)
+                    rows.append({
+                        "date": d,
+                        "store_id": store_id,
+                        "receipt_id": f"R{receipt_id:08d}",
+                        "product_name": name,
+                        "dept_id": dept,
+                        "qty": qty,
+                        "net_sales": round(price * qty, 2),
+                    })
+    return pd.DataFrame(rows)
+
+
+def _generate_demo_budget_data() -> pd.DataFrame:
+    """Generate demo budget data."""
+    np.random.seed(900)
+    stores = ["S001", "S002", "S003", "S004"]
+    depts = ["food", "produce", "seafood", "meat", "deli", "store_mgmt"]
+    yms = _generate_demo_dates(12)
+
+    rows = []
+    for ym in yms:
+        for store_id in stores:
+            for dept_id in depts:
+                budget_sales = round(np.random.uniform(800_000, 6_000_000), 2)
+                budget_profit = round(budget_sales * np.random.uniform(0.18, 0.35), 2)
+                rows.append({
+                    "ym": ym,
+                    "store_id": store_id,
+                    "dept_id": dept_id,
+                    "budget_sales": budget_sales,
+                    "budget_gross_profit": budget_profit,
+                    "budget_margin_pct": round(budget_profit / budget_sales * 100, 1),
+                })
+    return pd.DataFrame(rows)
+
+
+def _generate_demo_daily_sales() -> pd.DataFrame:
+    """Generate demo daily sales data."""
+    np.random.seed(950)
+    stores = ["S001", "S002", "S003", "S004"]
+    store_names = {"S001": "バンコク中央店", "S002": "チェンマイ店", "S003": "パタヤ店", "S004": "プーケット店"}
+    depts = ["food", "produce", "seafood", "meat", "deli"]
+    today = date.today()
+    dates = [today - timedelta(days=i) for i in range(90)]
+
+    rows = []
+    for d in dates:
+        dow = d.weekday() + 1
+        # Weekend boost
+        dow_factor = 1.3 if dow >= 6 else 1.0
+        for store_id in stores:
+            for dept_id in depts:
+                base = np.random.uniform(50_000, 400_000) * dow_factor
+                net_sales = round(base, 2)
+                gross_profit = round(net_sales * np.random.uniform(0.18, 0.35), 2)
+                rows.append({
+                    "date": d,
+                    "store_id": store_id,
+                    "store_name": store_names[store_id],
+                    "dept_id": dept_id,
+                    "net_sales": net_sales,
+                    "gross_profit": gross_profit,
+                    "qty": int(np.random.uniform(100, 3000)),
+                    "receipts": int(np.random.uniform(30, 500) * dow_factor),
+                    "dow": dow,
+                    "dow_name": ["月", "火", "水", "木", "金", "土", "日"][dow - 1],
+                })
+    return pd.DataFrame(rows)
+
+
+def _generate_demo_discount_detail() -> pd.DataFrame:
+    """Generate demo discount detail data."""
+    np.random.seed(1000)
+    stores = ["S001", "S002", "S003", "S004"]
+    depts = ["food", "produce", "seafood", "meat", "deli"]
+    reasons = [
+        ("期限間近", 0.35), ("見切り品", 0.25), ("販促値引", 0.20),
+        ("破損品", 0.08), ("従業員割引", 0.07), ("その他", 0.05),
+    ]
+    timebands = ["09-12", "12-15", "15-18", "18-21"]
+    today = date.today()
+    dates = [today - timedelta(days=i) for i in range(30)]
+
+    rows = []
+    for d in dates:
+        for store_id in stores:
+            for dept_id in depts:
+                base_total = np.random.uniform(30_000, 200_000)
+                for reason, ratio in reasons:
+                    for tb in timebands:
+                        # Evening discount spike for expiry/markdown
+                        time_weight = 2.5 if tb == "18-21" and reason in ("期限間近", "見切り品") else 1.0
+                        amount = round(base_total * ratio * 0.25 * time_weight * np.random.uniform(0.5, 1.5), 2)
+                        count = max(1, int(amount / np.random.uniform(20, 100)))
+                        rows.append({
+                            "date": d,
+                            "store_id": store_id,
+                            "dept_id": dept_id,
+                            "discount_reason": reason,
+                            "timeband": tb,
+                            "discount_amount": amount,
+                            "discount_count": count,
+                            "avg_discount": round(amount / count, 2),
+                        })
+    return pd.DataFrame(rows)
+
+
+def _generate_demo_waste_data() -> pd.DataFrame:
+    """Generate demo waste/loss data."""
+    np.random.seed(1100)
+    stores = ["S001", "S002", "S003", "S004"]
+    store_names = {"S001": "バンコク中央店", "S002": "チェンマイ店", "S003": "パタヤ店", "S004": "プーケット店"}
+    depts = [
+        ("produce", "青果"), ("seafood", "鮮魚"), ("meat", "精肉"), ("deli", "惣菜"), ("food", "食品"),
+    ]
+    waste_types = ["期限切れ廃棄", "破損廃棄", "調理ロス", "棚卸差異"]
+    yms = _generate_demo_dates(12)
+
+    rows = []
+    for ym in yms:
+        for store_id in stores:
+            for dept_id, dept_name in depts:
+                # Perishables have higher waste
+                base_rate = {"produce": 0.06, "seafood": 0.05, "meat": 0.04, "deli": 0.08, "food": 0.015}
+                dept_sales = np.random.uniform(500_000, 3_000_000)
+                for wtype in waste_types:
+                    type_ratio = {"期限切れ廃棄": 0.5, "破損廃棄": 0.15, "調理ロス": 0.25, "棚卸差異": 0.1}
+                    waste_amount = round(
+                        dept_sales * base_rate[dept_id] * type_ratio[wtype] * np.random.uniform(0.5, 1.5), 2
+                    )
+                    rows.append({
+                        "ym": ym,
+                        "store_id": store_id,
+                        "store_name": store_names[store_id],
+                        "dept_id": dept_id,
+                        "dept_name": dept_name,
+                        "waste_type": wtype,
+                        "waste_amount": waste_amount,
+                        "waste_qty": int(waste_amount / np.random.uniform(30, 150)),
+                        "dept_sales": round(dept_sales, 2),
+                        "waste_rate_pct": round(waste_amount / dept_sales * 100, 2),
+                    })
+    return pd.DataFrame(rows)
+
+
 @st.cache_data(ttl=60)
 def load_import_history() -> pd.DataFrame:
     """Load import audit log."""
@@ -441,6 +649,118 @@ def load_import_history() -> pd.DataFrame:
         "imported_at", "imported_by", "row_count", "status",
         "error_message", "error_rows",
     ])
+
+
+@st.cache_data(ttl=300)
+def load_timeband_data() -> pd.DataFrame:
+    """Load time-band sales data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_kpi_timeband`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Timeband query failed, using demo data: {e}")
+    return _generate_demo_timeband_data()
+
+
+@st.cache_data(ttl=300)
+def load_basket_data() -> pd.DataFrame:
+    """Load basket/receipt line data for co-purchase analysis."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_basket_analysis`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Basket query failed, using demo data: {e}")
+    return _generate_demo_basket_data()
+
+
+@st.cache_data(ttl=300)
+def load_budget_data() -> pd.DataFrame:
+    """Load budget data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_budget`
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Budget query failed, using demo data: {e}")
+    return _generate_demo_budget_data()
+
+
+@st.cache_data(ttl=300)
+def load_daily_sales() -> pd.DataFrame:
+    """Load daily sales data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_sales_daily`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Daily sales query failed, using demo data: {e}")
+    return _generate_demo_daily_sales()
+
+
+@st.cache_data(ttl=300)
+def load_discount_detail() -> pd.DataFrame:
+    """Load discount detail data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_discount_detail`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Discount detail query failed, using demo data: {e}")
+    return _generate_demo_discount_detail()
+
+
+@st.cache_data(ttl=300)
+def load_waste_data() -> pd.DataFrame:
+    """Load waste/loss data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_waste_loss`
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Waste query failed, using demo data: {e}")
+    return _generate_demo_waste_data()
 
 
 def get_store_list() -> list[tuple[str, str]]:

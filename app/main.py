@@ -94,56 +94,62 @@ def main() -> None:
     show_user_info_sidebar()
 
     # Navigation
+    _PAGES = [
+        "--- 概況 ---",
+        "Executive Summary",
+        "Alert Dashboard",
+        "--- 切口分析 ---",
+        "Department View",
+        "Store View",
+        "Store x Department",
+        "Product Analysis",
+        "--- 深掘り ---",
+        "Timeband Analysis",
+        "Daily Trend",
+        "Basket Analysis",
+        "Discount Analysis",
+        "Waste Analysis",
+        "Budget vs Actual",
+        "OOS Analysis",
+        "--- 管理 ---",
+        "Import / Admin",
+        "Export / Report",
+    ]
+
+    _PAGE_MAP = {
+        "Executive Summary": "app.pages.executive_summary",
+        "Alert Dashboard": "app.pages.alert_view",
+        "Department View": "app.pages.department_view",
+        "Store View": "app.pages.store_view",
+        "Store x Department": "app.pages.store_dept_view",
+        "Product Analysis": "app.pages.product_view",
+        "Timeband Analysis": "app.pages.timeband_view",
+        "Daily Trend": "app.pages.daily_trend_view",
+        "Basket Analysis": "app.pages.basket_view",
+        "Discount Analysis": "app.pages.discount_view",
+        "Waste Analysis": "app.pages.waste_view",
+        "Budget vs Actual": "app.pages.budget_view",
+        "OOS Analysis": "app.pages.oos_analysis",
+        "Import / Admin": "app.pages.import_admin",
+        "Export / Report": "app.pages.export_report",
+    }
+
     with st.sidebar:
         st.divider()
         page = st.radio(
             "ページ選択",
-            options=[
-                "Executive Summary",
-                "Department View",
-                "Store View",
-                "Store × Department",
-                "Product Analysis",
-                "OOS Analysis",
-                "Import / Admin",
-                "Export / Report",
-            ],
+            options=_PAGES,
+            format_func=lambda x: x if not x.startswith("---") else x.replace("---", "").strip(),
             key="nav_page",
         )
 
-    # Route to selected page
-    if page == "Executive Summary":
-        from app.pages.executive_summary import render
+    # Skip section headers
+    if page.startswith("---"):
+        page = "Executive Summary"
 
-        render()
-    elif page == "Department View":
-        from app.pages.department_view import render
-
-        render()
-    elif page == "Store View":
-        from app.pages.store_view import render
-
-        render()
-    elif page == "Store × Department":
-        from app.pages.store_dept_view import render
-
-        render()
-    elif page == "Product Analysis":
-        from app.pages.product_view import render
-
-        render()
-    elif page == "OOS Analysis":
-        from app.pages.oos_analysis import render
-
-        render()
-    elif page == "Import / Admin":
-        from app.pages.import_admin import render
-
-        render()
-    elif page == "Export / Report":
-        from app.pages.export_report import render
-
-        render()
+    import importlib
+    module = importlib.import_module(_PAGE_MAP[page])
+    module.render()
 
 
 if __name__ == "__main__":
