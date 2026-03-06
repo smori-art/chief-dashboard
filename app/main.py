@@ -25,18 +25,13 @@ _MINIMAL_CSS = """
         font-size: 0.85rem;
     }
 
-    /* KPI metric cards */
+    /* KPI metric cards (st.metric fallback + custom HTML cards) */
     div[data-testid="stMetric"] {
         background: #ffffff !important;
         border: 1px solid #E2E8F0 !important;
         border-radius: 10px !important;
         padding: 16px 20px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
-        transition: box-shadow 0.15s ease, transform 0.15s ease !important;
-    }
-    div[data-testid="stMetric"]:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-        transform: translateY(-1px);
     }
     div[data-testid="stMetric"] label {
         color: #64748B !important;
@@ -67,7 +62,7 @@ _MINIMAL_CSS = """
         font-weight: 700 !important;
         font-size: 1.5rem !important;
         color: #0F172A !important;
-        border-bottom: 2px solid #2563EB !important;
+        border-bottom: 2px solid #9B2335 !important;
         padding-bottom: 0.5rem !important;
     }
     h2 {
@@ -105,10 +100,10 @@ _MINIMAL_CSS = """
         color: #0F172A !important;
     }
     section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
-        background: #EFF6FF !important;
+        background: #FDF2F4 !important;
         border: none !important;
-        border-left: 3px solid #2563EB !important;
-        color: #2563EB !important;
+        border-left: 3px solid #9B2335 !important;
+        color: #9B2335 !important;
         font-size: 0.84rem !important;
         font-weight: 600 !important;
         text-align: left !important;

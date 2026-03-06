@@ -40,36 +40,76 @@ def render() -> None:
 
     sales_col = get_sales_column(filters)
 
-    # --- KPI Cards ---
-    st.subheader(f"月次KPI ({filters['ym']})")
+    # --- Helper: aggregate for a given ym ---
+    def _agg_for_ym(ym: str) -> dict | None:
+        """Aggregate key metrics for a specific year-month."""
+        sub = df[
+            (df["ym"] == ym)
+            & (df["store_id"].isin(filters["store_ids"]))
+            & (df["dept_id"].isin(filters["dept_ids"]))
+        ]
+        if sub.empty:
+            return None
+        t = sub.agg({
+            "gross_sales_ex_tax": "sum",
+            "net_sales_ex_tax": "sum",
+            "discount_amount_ex_tax": "sum",
+            "gross_profit": "sum",
+            "qty": "sum",
+            "receipts": "sum",
+            "refund_amount": "sum",
+        })
+        net = t["net_sales_ex_tax"]
+        gross = t["gross_sales_ex_tax"]
+        return {
+            "sales": t[sales_col],
+            "net_sales": net,
+            "gross_profit": t["gross_profit"],
+            "margin": (t["gross_profit"] / net * 100) if net else 0,
+            "discount_rate": (t["discount_amount_ex_tax"] / gross * 100) if gross else 0,
+            "refund": t["refund_amount"],
+            "receipts": t["receipts"],
+            "qty": t["qty"],
+            "basket": (net / t["receipts"]) if t["receipts"] else 0,
+        }
 
-    # Aggregate across selected stores and departments
-    total = df_filtered.agg({
-        "gross_sales_ex_tax": "sum",
-        "net_sales_ex_tax": "sum",
-        "discount_amount_ex_tax": "sum",
-        "gross_profit": "sum",
-        "qty": "sum",
-        "receipts": "sum",
-        "refund_amount": "sum",
-    })
+    def _shift_ym(ym: str, years: int = 0, months: int = 0) -> str:
+        """Shift a 'YYYY-MM' string by years/months."""
+        y, m = int(ym[:4]), int(ym[5:7])
+        y += years
+        m += months
+        while m < 1:
+            m += 12
+            y -= 1
+        while m > 12:
+            m -= 12
+            y += 1
+        return f"{y}-{m:02d}"
 
-    total_sales = total[sales_col]
-    total_net = total["net_sales_ex_tax"]
-    total_gross_profit = total["gross_profit"]
-    total_margin = (
-        total_gross_profit / total_net * 100 if total_net else 0
-    )
-    total_discount = total["discount_amount_ex_tax"]
-    discount_rate = (
-        total_discount / total["gross_sales_ex_tax"] * 100
-        if total["gross_sales_ex_tax"] else 0
-    )
+    def _pct(cur: float | None, ref: float | None) -> float | None:
+        """Return percentage ratio (100 = flat)."""
+        if cur is None or ref is None or ref == 0:
+            return None
+        return cur / ref * 100
 
-    # YoY deltas
-    yoy_sales = df_filtered[f"{sales_col.replace('_ex_tax', '')}_yoy"].sum() if f"{sales_col.replace('_ex_tax', '')}_yoy" in df_filtered.columns else None
-    yoy_profit = df_filtered["gross_profit_yoy"].sum() if "gross_profit_yoy" in df_filtered.columns else None
-    yoy_margin = df_filtered["gross_margin_yoy_diff"].mean() if "gross_margin_yoy_diff" in df_filtered.columns else None
+    # Aggregate current and comparison periods
+    cur_ym = filters["ym"]
+    agg_cur = _agg_for_ym(cur_ym)
+    agg_yoy = _agg_for_ym(_shift_ym(cur_ym, years=-1))
+    agg_yoy2 = _agg_for_ym(_shift_ym(cur_ym, years=-2))
+    agg_mom = _agg_for_ym(_shift_ym(cur_ym, months=-1))
+
+    if agg_cur is None:
+        st.warning("選択された条件に該当するデータがありません。")
+        return
+
+    def _comps(key: str) -> list[dict]:
+        """Build comparison badges for a metric key."""
+        return [
+            {"label": "前年", "value": _pct(agg_cur[key], agg_yoy[key] if agg_yoy else None)},
+            {"label": "前々年", "value": _pct(agg_cur[key], agg_yoy2[key] if agg_yoy2 else None)},
+            {"label": "前月", "value": _pct(agg_cur[key], agg_mom[key] if agg_mom else None)},
+        ]
 
     # Forecast
     df_forecast = load_forecast()
@@ -87,32 +127,56 @@ def render() -> None:
         (df["store_id"].isin(filters["store_ids"]))
         & (df["dept_id"].isin(filters["dept_ids"]))
     ]
-    spark_sales: list[float] | None = None
-    spark_profit: list[float] | None = None
-    spark_margin: list[float] | None = None
+    sparks: dict[str, list[float] | None] = {
+        "sales": None, "gross_profit": None, "margin": None,
+        "discount_rate": None, "refund": None, "receipts": None,
+        "basket": None, "qty": None,
+    }
     if not df_trend_all.empty:
-        _spark = df_trend_all.groupby("ym").agg({
-            sales_col: "sum",
-            "gross_profit": "sum",
+        _sp = df_trend_all.groupby("ym").agg({
+            "gross_sales_ex_tax": "sum",
             "net_sales_ex_tax": "sum",
+            "discount_amount_ex_tax": "sum",
+            "gross_profit": "sum",
+            "qty": "sum",
+            "receipts": "sum",
+            "refund_amount": "sum",
         }).sort_index().tail(6)
-        if len(_spark) >= 2:
-            spark_sales = _spark[sales_col].tolist()
-            spark_profit = _spark["gross_profit"].tolist()
-            _m = (_spark["gross_profit"] / _spark["net_sales_ex_tax"] * 100).round(1)
-            spark_margin = _m.tolist()
+        if len(_sp) >= 2:
+            sparks["sales"] = _sp[sales_col].tolist()
+            sparks["gross_profit"] = _sp["gross_profit"].tolist()
+            sparks["margin"] = (
+                _sp["gross_profit"] / _sp["net_sales_ex_tax"] * 100
+            ).round(1).tolist()
+            sparks["discount_rate"] = (
+                _sp["discount_amount_ex_tax"] / _sp["gross_sales_ex_tax"] * 100
+            ).round(1).tolist()
+            sparks["refund"] = _sp["refund_amount"].tolist()
+            sparks["receipts"] = _sp["receipts"].tolist()
+            sparks["basket"] = (
+                _sp["net_sales_ex_tax"] / _sp["receipts"]
+            ).round(0).tolist()
+            sparks["qty"] = _sp["qty"].tolist()
 
-    # Render KPI cards
+    # --- KPI Cards ---
+    st.subheader(f"月次KPI ({cur_ym})")
+
+    total_sales = agg_cur["sales"]
+    total_gross_profit = agg_cur["gross_profit"]
+    total_margin = agg_cur["margin"]
+    discount_rate = agg_cur["discount_rate"]
+    total_net = agg_cur["net_sales"]
+
+    # Row 1
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         sales_label = "実売上" if filters["sales_type"] == "net" else "粗売上"
         render_kpi_card(
             label=f"{sales_label} (税抜)",
             value=total_sales,
-            delta=yoy_sales,
-            delta_suffix=" (前年差)",
             prefix="฿",
-            sparkline=spark_sales,
+            comparisons=_comps("sales"),
+            sparkline=sparks["sales"],
             target=forecast_total,
         )
 
@@ -120,21 +184,19 @@ def render() -> None:
         render_kpi_card(
             label="粗利額",
             value=total_gross_profit,
-            delta=yoy_profit,
-            delta_suffix=" (前年差)",
             prefix="฿",
-            sparkline=spark_profit,
+            comparisons=_comps("gross_profit"),
+            sparkline=sparks["gross_profit"],
         )
 
     with col3:
         render_kpi_card(
             label="粗利率",
             value=total_margin,
-            delta=yoy_margin,
-            delta_suffix="pt",
             suffix="%",
             fmt=".1f",
-            sparkline=spark_margin,
+            comparisons=_comps("margin"),
+            sparkline=sparks["margin"],
         )
 
     with col4:
@@ -143,33 +205,42 @@ def render() -> None:
             value=discount_rate,
             suffix="%",
             fmt=".1f",
+            comparisons=_comps("discount_rate"),
+            sparkline=sparks["discount_rate"],
         )
 
-    # Second row of KPIs
+    # Row 2
     col5, col6, col7, col8 = st.columns(4)
     with col5:
         render_kpi_card(
             label="返品返金額",
-            value=total["refund_amount"],
+            value=agg_cur["refund"],
             prefix="฿",
+            comparisons=_comps("refund"),
+            sparkline=sparks["refund"],
         )
     with col6:
         render_kpi_card(
             label="レシート件数",
-            value=int(total["receipts"]),
+            value=int(agg_cur["receipts"]),
+            comparisons=_comps("receipts"),
+            sparkline=sparks["receipts"],
         )
     with col7:
-        avg_basket = total_net / total["receipts"] if total["receipts"] else 0
         render_kpi_card(
             label="客単価",
-            value=avg_basket,
+            value=agg_cur["basket"],
             prefix="฿",
             fmt=",.0f",
+            comparisons=_comps("basket"),
+            sparkline=sparks["basket"],
         )
     with col8:
         render_kpi_card(
             label="売上点数",
-            value=int(total["qty"]),
+            value=int(agg_cur["qty"]),
+            comparisons=_comps("qty"),
+            sparkline=sparks["qty"],
         )
 
     st.divider()
