@@ -3,6 +3,7 @@ services:
     name: chief-dashboard
     runtime: docker
     plan: free
+    branch: claude/thai-supermarket-dashboard-U7jFA
     dockerfilePath: ./Dockerfile
     envVars:
       - key: STREAMLIT_SERVER_PORT
