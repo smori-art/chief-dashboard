@@ -11,6 +11,8 @@ Displays:
 
 from __future__ import annotations
 
+import base64
+from pathlib import Path
 import re
 
 import pandas as pd
@@ -500,21 +502,33 @@ def _display_comp_table(
 def render() -> None:
     """Render Executive Summary page."""
 
-    # ── System header with version ───────────────────────────────────────
-    hdr_left, hdr_right = st.columns([4, 1])
-    with hdr_left:
-        st.markdown(
-            '<p style="font-size:1.1rem;font-weight:700;color:#475569;'
-            'letter-spacing:0.06em;margin-bottom:0">'
-            'LOPIA JAPAN Thailand 月次ダッシュボード</p>',
-            unsafe_allow_html=True,
-        )
-    with hdr_right:
-        st.markdown(
-            f'<p style="text-align:right;font-size:0.72rem;color:#94A3B8;'
-            f'margin-bottom:0">{APP_VERSION}</p>',
-            unsafe_allow_html=True,
-        )
+    # ── Reduce top padding & render header with logo ─────────────────────
+    st.markdown(
+        '<style>'
+        'section.main > div.block-container {padding-top: 1rem !important;}'
+        '</style>',
+        unsafe_allow_html=True,
+    )
+
+    # Load logo as base64 for inline embedding
+    _logo_path = Path(__file__).resolve().parent.parent / "assets" / "lopia_logo.png"
+    if _logo_path.exists():
+        _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+        _logo_img = f'<img src="data:image/png;base64,{_logo_b64}" style="height:44px;margin-right:12px;vertical-align:middle">'
+    else:
+        _logo_img = ""
+
+    st.markdown(
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">'
+        f'<div style="display:flex;align-items:center">'
+        f'{_logo_img}'
+        f'<span style="font-size:1.1rem;font-weight:700;color:#475569;'
+        f'letter-spacing:0.06em">Thailand 月次ダッシュボード</span>'
+        f'</div>'
+        f'<span style="font-size:0.72rem;color:#94A3B8">{APP_VERSION}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     filters = render_sidebar_filters()
     df = load_sales_monthly()
