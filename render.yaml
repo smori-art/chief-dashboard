@@ -14,3 +14,17 @@ services:
         value: "true"
       - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
         value: "false"
+      # BigQuery (set via Render Dashboard)
+      - key: GCP_PROJECT_ID
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false
+      - key: BQ_DATASET_RAW
+        value: chief_raw
+      - key: BQ_DATASET_STG
+        value: chief_stg
+      - key: BQ_DATASET_MART
+        value: chief_mart
+      # Auth
+      - key: AUTH_USERS
+        sync: false

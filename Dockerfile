@@ -29,8 +29,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:${PORT}/_stcore/health || exit 1
 
-# Run Streamlit - use shell form so $PORT is expanded at runtime
-CMD streamlit run streamlit_app.py \
-    --server.port=${PORT} \
-    --server.address=0.0.0.0 \
-    --server.headless=true
+# Run via start script (handles GCP credentials from env)
+CMD ["bash", "start.sh"]
