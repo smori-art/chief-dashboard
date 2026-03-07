@@ -28,7 +28,10 @@ from app.components import (
     render_kpi_card,
     render_sidebar_filters,
 )
-from app.data import load_forecast, load_sales_monthly, load_store_pl
+from app.data import load_budget_pl, load_forecast, load_sales_monthly, load_store_pl
+
+# THB → JPY conversion rate
+THB_TO_JPY = 4.2
 
 APP_VERSION = "v1.2.0"
 
@@ -588,30 +591,24 @@ def render() -> None:
     # Section 1.5: PL-based KPI Cards + Company P&L Table
     # =====================================================================
     df_pl = load_store_pl()
+    df_budget_pl = load_budget_pl()
     if not df_pl.empty:
         pl_cur = _agg_pl(df_pl, cur_ym, filters["store_ids"])
         pl_yoy = _agg_pl(df_pl, _shift_ym(cur_ym, years=-1), filters["store_ids"])
         pl_yoy2 = _agg_pl(df_pl, _shift_ym(cur_ym, years=-2), filters["store_ids"])
         pl_mom = _agg_pl(df_pl, _shift_ym(cur_ym, months=-1), filters["store_ids"])
         pl_mom2 = _agg_pl(df_pl, _shift_ym(cur_ym, months=-2), filters["store_ids"])
+        pl_budget = _agg_pl(df_budget_pl, cur_ym, filters["store_ids"]) if not df_budget_pl.empty else None
 
         if pl_cur is not None:
-            def _pl_comps(key: str) -> list[dict]:
-                return [
-                    {"label": "前年", "value": _pct(pl_cur[key], pl_yoy[key] if pl_yoy else None)},
-                    {"label": "前々年", "value": _pct(pl_cur[key], pl_yoy2[key] if pl_yoy2 else None)},
-                    {"label": "前月", "value": _pct(pl_cur[key], pl_mom[key] if pl_mom else None)},
-                ]
-
             def _ratio_comps(key: str) -> list[dict]:
                 """For ratio KPIs, show pt difference instead of percentage."""
                 comps = []
-                for lbl, ref in [("前年", pl_yoy), ("前々年", pl_yoy2), ("前月", pl_mom)]:
+                for lbl, ref in [("前年", pl_yoy), ("前々年", pl_yoy2), ("前月", pl_mom), ("予算", pl_budget)]:
                     if ref is None:
                         comps.append({"label": lbl, "value": None})
                     else:
                         diff = pl_cur[key] - ref[key]
-                        # Use 100+diff so positive diff shows as ▲, negative as ▼
                         comps.append({"label": lbl, "value": 100 + diff})
                 return comps
 
@@ -647,9 +644,11 @@ def render() -> None:
             # ── Company-wide P&L Table ────────────────────────────────────
             st.divider()
             st.subheader("全社PL")
+            st.caption(f"換算レート: 1 THB = {THB_TO_JPY} JPY")
 
             pl_periods = [
                 ("当期", pl_cur),
+                ("予算", pl_budget),
                 ("前年", pl_yoy),
                 ("前々年", pl_yoy2),
                 ("前月", pl_mom),
@@ -673,68 +672,78 @@ def render() -> None:
 
             ratio_keys = {"gross_margin_pct", "operating_margin_pct"}
 
-            # Build header
-            header_cols = ["科目", "当期"]
+            # ── Header row ──
+            th = '<th style="padding:6px 8px;text-align:{align};font-weight:600;' \
+                 'white-space:nowrap;border-bottom:2px solid #CBD5E1;font-size:0.72rem">{txt}</th>'
+            header_parts = [th.format(align="left", txt="科目")]
+            # Current period: THB + JPY
+            header_parts.append(th.format(align="right", txt="当期 (฿)"))
+            header_parts.append(th.format(align="right", txt="当期 (¥)"))
+            # Each comparison period: value(฿) + value(¥) + 比
             for lbl, _ in pl_periods[1:]:
-                header_cols.extend([lbl, f"{lbl}比"])
-            header_html = "".join(
-                f'<th style="padding:6px 10px;text-align:{"left" if i == 0 else "right"};'
-                f'font-weight:600">{c}</th>'
-                for i, c in enumerate(header_cols)
-            )
+                header_parts.append(th.format(align="right", txt=f"{lbl} (฿)"))
+                header_parts.append(th.format(align="right", txt=f"{lbl} (¥)"))
+                header_parts.append(th.format(align="right", txt=f"{lbl}比"))
+            header_html = "".join(header_parts)
 
-            # Build rows
+            # ── Helper to format a cell value ──
+            def _fmt_cell(val, is_ratio: bool, style: str, as_jpy: bool = False) -> str:
+                if val is None:
+                    return f'<td style="padding:4px 8px;text-align:right;{style}">--</td>'
+                if is_ratio:
+                    return f'<td style="padding:4px 8px;text-align:right;{style}">{val:.1f}%</td>'
+                if as_jpy:
+                    jpy = val * THB_TO_JPY
+                    return f'<td style="padding:4px 8px;text-align:right;{style}">¥{jpy:,.0f}</td>'
+                return f'<td style="padding:4px 8px;text-align:right;{style}">฿{val:,.0f}</td>'
+
+            # ── Build rows ──
             rows_html = []
             for item_name, key in pl_line_items:
                 is_ratio = key in ratio_keys
                 is_subtotal = key in {"gross_profit", "total_opex", "operating_profit"}
+                rs = "font-weight:600;background:#F8FAFC" if is_subtotal else ""
 
-                row_style = 'font-weight:600;background:#F8FAFC' if is_subtotal else ''
-                cells = [f'<td style="padding:5px 10px;{row_style}">{item_name}</td>']
+                cells = [f'<td style="padding:4px 8px;white-space:nowrap;{rs}">{item_name}</td>']
+                cur_val = pl_cur[key]
 
-                cur_val = pl_cur[key] if pl_cur else None
-
-                # Current period value
-                if cur_val is not None:
-                    if is_ratio:
-                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">{cur_val:.1f}%</td>')
-                    else:
-                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">฿{cur_val:,.0f}</td>')
+                # Current period THB + JPY
+                cells.append(_fmt_cell(cur_val, is_ratio, rs))
+                if is_ratio:
+                    cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
                 else:
-                    cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+                    cells.append(_fmt_cell(cur_val, False, rs, as_jpy=True))
 
                 # Comparison periods
                 for lbl, ref in pl_periods[1:]:
                     ref_val = ref[key] if ref else None
-                    # Absolute value
-                    if ref_val is not None:
-                        if is_ratio:
-                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">{ref_val:.1f}%</td>')
-                        else:
-                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">฿{ref_val:,.0f}</td>')
+                    # THB value
+                    cells.append(_fmt_cell(ref_val, is_ratio, rs))
+                    # JPY value
+                    if is_ratio:
+                        cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
                     else:
-                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
-
-                    # Ratio comparison
+                        cells.append(_fmt_cell(ref_val, False, rs, as_jpy=True))
+                    # Comparison ratio
                     if cur_val is not None and ref_val is not None:
                         if is_ratio:
                             diff = cur_val - ref_val
                             color = POSITIVE if diff >= 0 else NEGATIVE
                             cells.append(
-                                f'<td style="padding:5px 10px;text-align:right;{row_style}">'
+                                f'<td style="padding:4px 8px;text-align:right;{rs}">'
                                 f'<span style="color:{color};font-weight:600">{diff:+.1f}pt</span></td>'
                             )
                         elif ref_val != 0:
                             pct = cur_val / ref_val * 100
                             color = POSITIVE if pct >= 100 else NEGATIVE
                             cells.append(
-                                f'<td style="padding:5px 10px;text-align:right;{row_style}">'
+                                f'<td style="padding:4px 8px;text-align:right;{rs}">'
                                 f'<span style="color:{color};font-weight:600">{pct:.1f}%</span></td>'
                             )
                         else:
-                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+                            cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
                     else:
-                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+                        cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
 
                 rows_html.append(
                     f'<tr style="border-bottom:1px solid #E2E8F0">{"".join(cells)}</tr>'
@@ -742,9 +751,9 @@ def render() -> None:
 
             pl_html = (
                 '<div style="overflow-x:auto">'
-                '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'
+                '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">'
                 f'<thead style="background:#F1F5F9;color:#334155">'
-                f'<tr style="border-bottom:1px solid #E2E8F0">{header_html}</tr></thead>'
+                f'<tr>{header_html}</tr></thead>'
                 f'<tbody>{"".join(rows_html)}</tbody></table></div>'
             )
             st.markdown(pl_html, unsafe_allow_html=True)
