@@ -131,16 +131,21 @@ def _build_comp_table(
     store_ids: list,
     dept_ids: list,
     sales_col: str,
+    df_budget_pl: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build a composition table: 1000THB units, integer percentages."""
     yms = {
         "当期": cur_ym,
+        "予算": cur_ym,  # budget uses same ym
         "前年": _shift_ym(cur_ym, years=-1),
         "前々年": _shift_ym(cur_ym, years=-2),
         "前月": _shift_ym(cur_ym, months=-1),
+        "前々月": _shift_ym(cur_ym, months=-2),
     }
     frames = {}
     for label, ym in yms.items():
+        if label == "予算":
+            continue  # handled separately below
         sub = df_full[
             (df_full["ym"] == ym)
             & (df_full["store_id"].isin(store_ids))
@@ -154,6 +159,22 @@ def _build_comp_table(
         }).reset_index()
         frames[label] = agg
 
+    # Budget frame — aggregate from budget PL using store_name grouping
+    if df_budget_pl is not None and not df_budget_pl.empty:
+        bsub = df_budget_pl[
+            (df_budget_pl["ym"] == cur_ym)
+            & (df_budget_pl["store_id"].isin(store_ids))
+        ]
+        if not bsub.empty and group_name_col in bsub.columns:
+            bagg = bsub.groupby(group_name_col).agg({"net_sales": "sum", "gross_profit": "sum"}).reset_index()
+            # Rename net_sales to match sales_col for consistency
+            bagg[sales_col] = bagg["net_sales"]
+            frames["予算"] = bagg
+        else:
+            frames["予算"] = None
+    else:
+        frames["予算"] = None
+
     cur = frames["当期"]
     if cur is None:
         return pd.DataFrame()
@@ -163,7 +184,6 @@ def _build_comp_table(
 
     result = pd.DataFrame()
     result["名称"] = cur[group_name_col]
-    # 1000THB unit, integer, with thousand separator as string
     sales_k = (cur[sales_col].values / 1000).round(0).astype(int)
     profit_k = (cur["gross_profit"].values / 1000).round(0).astype(int)
     result["売上(千฿)"] = [f"{v:,}" for v in sales_k]
@@ -171,11 +191,10 @@ def _build_comp_table(
     result["売上構成比"] = [f"{v}%" for v in (cur[sales_col].values / total_sales * 100).round(0).astype(int)]
     result["粗利構成比"] = [f"{v}%" for v in (cur["gross_profit"].values / total_profit * 100).round(0).astype(int)]
 
-    # Raw values for AI summary and sorting
     result["_売上_raw"] = cur[sales_col].values
     result["_粗利_raw"] = cur["gross_profit"].values
 
-    for period_label in ["前年", "前々年", "前月"]:
+    for period_label in ["予算", "前年", "前々年", "前月", "前々月"]:
         ref = frames.get(period_label)
         if ref is not None:
             ref_map_sales = dict(zip(ref[group_name_col], ref[sales_col]))
@@ -253,21 +272,26 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
     """Render a composition table as colored HTML."""
     amount_col = f"{prefix}(千฿)"
     share_col = f"{prefix}構成比"
-    yoy_col = f"{prefix}前年比"
-    yoy2_col = f"{prefix}前々年比"
-    mom_col = f"{prefix}前月比"
+    comp_cols = [
+        (f"{prefix}予算比", "予算比"),
+        (f"{prefix}前年比", "前年比"),
+        (f"{prefix}前々年比", "前々年比"),
+        (f"{prefix}前月比", "前月比"),
+        (f"{prefix}前々月比", "前々月比"),
+    ]
 
     header = f"<tr><th>名称</th><th>{amount_col}</th><th>構成比</th>"
-    header += "<th>前年比</th><th>前々年比</th><th>前月比</th></tr>"
+    for _, lbl in comp_cols:
+        header += f"<th>{lbl}</th>"
+    header += "</tr>"
 
     rows = []
     for _, r in df.iterrows():
         row = f"<td>{r['名称']}</td>"
         row += f"<td style='text-align:right'>{r.get(amount_col, '--')}</td>"
         row += f"<td style='text-align:right'>{r.get(share_col, '--')}</td>"
-        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(yoy_col))}</td>"
-        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(yoy2_col))}</td>"
-        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(mom_col))}</td>"
+        for col_key, _ in comp_cols:
+            row += f"<td style='text-align:right'>{_format_pct_cell(r.get(col_key))}</td>"
         rows.append(f"<tr>{row}</tr>")
 
     html = (
@@ -276,11 +300,9 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
         f"<thead style='background:#F1F5F9;color:#334155'>{header}</thead>"
         "<tbody>" + "".join(rows) + "</tbody></table></div>"
     )
-    # Add basic row borders via style
     html = html.replace("<tr>", '<tr style="border-bottom:1px solid #E2E8F0">')
     html = html.replace("<th>", '<th style="padding:6px 10px;text-align:left;font-weight:600">')
     html = html.replace("<td", '<td style="padding:5px 10px"')
-    # Fix double style attrs
     html = re.sub(
         r'<td style="padding:5px 10px" style=\'text-align:right\'>',
         '<td style="padding:5px 10px;text-align:right">',
@@ -289,16 +311,136 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
-def _display_comp_table(table: pd.DataFrame) -> None:
-    """Display composition table in a compact two-tab layout (売上 / 粗利)."""
+def _build_pl_comp_table(
+    df_pl: pd.DataFrame,
+    df_budget_pl: pd.DataFrame | None,
+    group_name_col: str,
+    cur_ym: str,
+    store_ids: list,
+    metric_key: str,
+) -> pd.DataFrame:
+    """Build a PL composition table for a given metric (e.g. operating_profit)."""
+    yms = {
+        "当期": cur_ym,
+        "予算": cur_ym,
+        "前年": _shift_ym(cur_ym, years=-1),
+        "前々年": _shift_ym(cur_ym, years=-2),
+        "前月": _shift_ym(cur_ym, months=-1),
+        "前々月": _shift_ym(cur_ym, months=-2),
+    }
+
+    def _get_frame(src: pd.DataFrame, ym: str) -> pd.DataFrame | None:
+        sub = src[(src["ym"] == ym) & (src["store_id"].isin(store_ids))]
+        if sub.empty or group_name_col not in sub.columns:
+            return None
+        return sub.groupby(group_name_col).agg({metric_key: "sum", "net_sales": "sum"}).reset_index()
+
+    frames = {}
+    for label, ym in yms.items():
+        if label == "予算":
+            frames[label] = _get_frame(df_budget_pl, ym) if df_budget_pl is not None and not df_budget_pl.empty else None
+        else:
+            frames[label] = _get_frame(df_pl, ym)
+
+    cur = frames["当期"]
+    if cur is None:
+        return pd.DataFrame()
+
+    result = pd.DataFrame()
+    result["名称"] = cur[group_name_col]
+    val_k = (cur[metric_key].values / 1000).round(0).astype(int)
+    result["金額(千฿)"] = [f"{v:,}" for v in val_k]
+    # Ratio to sales
+    result["対売上比"] = [f"{v:.1f}%" for v in (cur[metric_key].values / cur["net_sales"].values * 100)]
+    result["_raw"] = cur[metric_key].values
+
+    for period_label in ["予算", "前年", "前々年", "前月", "前々月"]:
+        ref = frames.get(period_label)
+        if ref is not None:
+            ref_map = dict(zip(ref[group_name_col], ref[metric_key]))
+            result[f"{period_label}比"] = result.apply(
+                lambda r, rm=ref_map: int(round(r["_raw"] / rm[r["名称"]] * 100))
+                if r["名称"] in rm and rm[r["名称"]] != 0 else None,
+                axis=1,
+            )
+        else:
+            result[f"{period_label}比"] = None
+
+    result = result.sort_values("_raw", ascending=False)
+    return result
+
+
+def _render_pl_comp_html_table(df: pd.DataFrame) -> None:
+    """Render a PL composition table as colored HTML."""
+    comp_labels = ["予算比", "前年比", "前々年比", "前月比", "前々月比"]
+    header = "<tr><th>名称</th><th>金額(千฿)</th><th>対売上比</th>"
+    for lbl in comp_labels:
+        header += f"<th>{lbl}</th>"
+    header += "</tr>"
+
+    rows = []
+    for _, r in df.iterrows():
+        row = f"<td>{r['名称']}</td>"
+        row += f"<td style='text-align:right'>{r.get('金額(千฿)', '--')}</td>"
+        row += f"<td style='text-align:right'>{r.get('対売上比', '--')}</td>"
+        for lbl in comp_labels:
+            row += f"<td style='text-align:right'>{_format_pct_cell(r.get(lbl))}</td>"
+        rows.append(f"<tr>{row}</tr>")
+
+    html = (
+        '<div style="overflow-x:auto">'
+        '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'
+        f"<thead style='background:#F1F5F9;color:#334155'>{header}</thead>"
+        "<tbody>" + "".join(rows) + "</tbody></table></div>"
+    )
+    html = html.replace("<tr>", '<tr style="border-bottom:1px solid #E2E8F0">')
+    html = html.replace("<th>", '<th style="padding:6px 10px;text-align:left;font-weight:600">')
+    html = html.replace("<td", '<td style="padding:5px 10px"')
+    html = re.sub(
+        r'<td style="padding:5px 10px" style=\'text-align:right\'>',
+        '<td style="padding:5px 10px;text-align:right">',
+        html,
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def _display_comp_table(
+    table: pd.DataFrame,
+    df_pl: pd.DataFrame | None = None,
+    df_budget_pl: pd.DataFrame | None = None,
+    group_name_col: str = "store_name",
+    cur_ym: str = "",
+    store_ids: list | None = None,
+) -> None:
+    """Display composition table with sales/profit + PL item tabs."""
     if table.empty:
         return
 
-    tab_sales, tab_profit = st.tabs(["売上", "粗利"])
-    with tab_sales:
+    tab_labels = ["売上", "粗利", "営業利益", "人件費", "販管費", "家賃", "減価償却費"]
+    tabs = st.tabs(tab_labels)
+
+    with tabs[0]:
         _render_comp_html_table(table, "売上")
-    with tab_profit:
+    with tabs[1]:
         _render_comp_html_table(table, "粗利")
+
+    if df_pl is not None and store_ids:
+        pl_tab_metrics = [
+            ("operating_profit", 2),
+            ("personnel_expense", 3),
+            ("total_opex", 4),
+            ("rent_expense", 5),
+            ("depreciation_expense", 6),
+        ]
+        for metric_key, tab_idx in pl_tab_metrics:
+            with tabs[tab_idx]:
+                pl_table = _build_pl_comp_table(
+                    df_pl, df_budget_pl, group_name_col, cur_ym, store_ids, metric_key,
+                )
+                if not pl_table.empty:
+                    _render_pl_comp_html_table(pl_table)
+                else:
+                    st.info("データがありません")
 
 
 def _generate_ai_summary(
@@ -437,8 +579,6 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-    st.title("全社概況")
-
     filters = render_sidebar_filters()
     df = load_sales_monthly()
     df_filtered = filter_dataframe(df, filters)
@@ -470,7 +610,11 @@ def render() -> None:
             {"label": "前月", "value": _pct(agg_cur[key], agg_mom[key] if agg_mom else None)},
         ]
 
-    # Build composition tables early (needed for AI summary)
+    # Load PL data early (needed for composition tables)
+    df_pl = load_store_pl()
+    df_budget_pl = load_budget_pl()
+
+    # Build composition tables
     dept_table = _build_comp_table(
         df, "dept_id", "dept_name", cur_ym,
         filters["store_ids"], filters["dept_ids"], sales_col,
@@ -478,18 +622,8 @@ def render() -> None:
     store_table = _build_comp_table(
         df, "store_id", "store_name", cur_ym,
         filters["store_ids"], filters["dept_ids"], sales_col,
+        df_budget_pl=df_budget_pl,
     )
-
-    # =====================================================================
-    # Section 0: AI Summary Report (top)
-    # =====================================================================
-    sales_label = "実売上" if filters["sales_type"] == "net" else "粗売上"
-    summary = _generate_ai_summary(
-        agg_cur, agg_yoy, agg_yoy2, agg_mom,
-        dept_table, store_table, sales_label, cur_ym,
-    )
-    with st.expander("AI 概況レポート", expanded=True):
-        st.markdown(summary)
 
     # Forecast
     df_forecast = load_forecast()
@@ -590,8 +724,6 @@ def render() -> None:
     # =====================================================================
     # Section 1.5: PL-based KPI Cards + Company P&L Table
     # =====================================================================
-    df_pl = load_store_pl()
-    df_budget_pl = load_budget_pl()
     if not df_pl.empty:
         pl_cur = _agg_pl(df_pl, cur_ym, filters["store_ids"])
         pl_yoy = _agg_pl(df_pl, _shift_ym(cur_ym, years=-1), filters["store_ids"])
@@ -644,15 +776,14 @@ def render() -> None:
             # ── Company-wide P&L Table ────────────────────────────────────
             st.divider()
             st.subheader("全社PL")
-            st.caption(f"換算レート: 1 THB = {THB_TO_JPY} JPY")
+            st.caption(f"単位: 千THB / 千JPY（換算レート: 1 THB = {THB_TO_JPY} JPY）")
 
-            pl_periods = [
-                ("当期", pl_cur),
-                ("予算", pl_budget),
-                ("前年", pl_yoy),
-                ("前々年", pl_yoy2),
-                ("前月", pl_mom),
-                ("前々月", pl_mom2),
+            pl_comparisons = [
+                ("予算比", pl_budget),
+                ("前年比", pl_yoy),
+                ("前々年比", pl_yoy2),
+                ("前月比", pl_mom),
+                ("前々月比", pl_mom2),
             ]
 
             pl_line_items = [
@@ -672,78 +803,61 @@ def render() -> None:
 
             ratio_keys = {"gross_margin_pct", "operating_margin_pct"}
 
-            # ── Header row ──
-            th = '<th style="padding:6px 8px;text-align:{align};font-weight:600;' \
-                 'white-space:nowrap;border-bottom:2px solid #CBD5E1;font-size:0.72rem">{txt}</th>'
-            header_parts = [th.format(align="left", txt="科目")]
-            # Current period: THB + JPY
-            header_parts.append(th.format(align="right", txt="当期 (฿)"))
-            header_parts.append(th.format(align="right", txt="当期 (¥)"))
-            # Each comparison period: value(฿) + value(¥) + 比
-            for lbl, _ in pl_periods[1:]:
-                header_parts.append(th.format(align="right", txt=f"{lbl} (฿)"))
-                header_parts.append(th.format(align="right", txt=f"{lbl} (¥)"))
-                header_parts.append(th.format(align="right", txt=f"{lbl}比"))
+            # ── Header ──
+            th = '<th style="padding:6px 8px;text-align:{a};font-weight:600;' \
+                 'white-space:nowrap;border-bottom:2px solid #CBD5E1;font-size:0.72rem">{t}</th>'
+            header_parts = [
+                th.format(a="left", t="科目"),
+                th.format(a="right", t="当期(千฿)"),
+                th.format(a="right", t="当期(千¥)"),
+            ]
+            for lbl, _ in pl_comparisons:
+                header_parts.append(th.format(a="right", t=lbl))
             header_html = "".join(header_parts)
 
-            # ── Helper to format a cell value ──
-            def _fmt_cell(val, is_ratio: bool, style: str, as_jpy: bool = False) -> str:
-                if val is None:
-                    return f'<td style="padding:4px 8px;text-align:right;{style}">--</td>'
-                if is_ratio:
-                    return f'<td style="padding:4px 8px;text-align:right;{style}">{val:.1f}%</td>'
-                if as_jpy:
-                    jpy = val * THB_TO_JPY
-                    return f'<td style="padding:4px 8px;text-align:right;{style}">¥{jpy:,.0f}</td>'
-                return f'<td style="padding:4px 8px;text-align:right;{style}">฿{val:,.0f}</td>'
-
-            # ── Build rows ──
+            # ── Rows ──
+            _td = '<td style="padding:4px 8px;text-align:{a};{s}">{v}</td>'
             rows_html = []
             for item_name, key in pl_line_items:
                 is_ratio = key in ratio_keys
-                is_subtotal = key in {"gross_profit", "total_opex", "operating_profit"}
-                rs = "font-weight:600;background:#F8FAFC" if is_subtotal else ""
+                is_sub = key in {"gross_profit", "total_opex", "operating_profit"}
+                rs = "font-weight:600;background:#F8FAFC" if is_sub else ""
 
-                cells = [f'<td style="padding:4px 8px;white-space:nowrap;{rs}">{item_name}</td>']
+                cells = [_td.format(a="left", s=rs + ";white-space:nowrap", v=item_name)]
                 cur_val = pl_cur[key]
 
-                # Current period THB + JPY
-                cells.append(_fmt_cell(cur_val, is_ratio, rs))
+                # Current: 千THB + 千JPY
                 if is_ratio:
-                    cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
+                    cells.append(_td.format(a="right", s=rs, v=f"{cur_val:.1f}%"))
+                    cells.append(_td.format(a="right", s=rs, v="--"))
                 else:
-                    cells.append(_fmt_cell(cur_val, False, rs, as_jpy=True))
+                    thb_k = cur_val / 1000
+                    jpy_k = cur_val * THB_TO_JPY / 1000
+                    cells.append(_td.format(a="right", s=rs, v=f"฿{thb_k:,.0f}"))
+                    cells.append(_td.format(a="right", s=rs, v=f"¥{jpy_k:,.0f}"))
 
-                # Comparison periods
-                for lbl, ref in pl_periods[1:]:
+                # Comparison ratios only
+                for lbl, ref in pl_comparisons:
                     ref_val = ref[key] if ref else None
-                    # THB value
-                    cells.append(_fmt_cell(ref_val, is_ratio, rs))
-                    # JPY value
-                    if is_ratio:
-                        cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
-                    else:
-                        cells.append(_fmt_cell(ref_val, False, rs, as_jpy=True))
-                    # Comparison ratio
                     if cur_val is not None and ref_val is not None:
                         if is_ratio:
                             diff = cur_val - ref_val
                             color = POSITIVE if diff >= 0 else NEGATIVE
-                            cells.append(
-                                f'<td style="padding:4px 8px;text-align:right;{rs}">'
-                                f'<span style="color:{color};font-weight:600">{diff:+.1f}pt</span></td>'
-                            )
+                            cells.append(_td.format(
+                                a="right", s=rs,
+                                v=f'<span style="color:{color};font-weight:600">{diff:+.1f}pt</span>',
+                            ))
                         elif ref_val != 0:
                             pct = cur_val / ref_val * 100
                             color = POSITIVE if pct >= 100 else NEGATIVE
-                            cells.append(
-                                f'<td style="padding:4px 8px;text-align:right;{rs}">'
-                                f'<span style="color:{color};font-weight:600">{pct:.1f}%</span></td>'
-                            )
+                            cells.append(_td.format(
+                                a="right", s=rs,
+                                v=f'<span style="color:{color};font-weight:600">{pct:.1f}%</span>',
+                            ))
                         else:
-                            cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
+                            cells.append(_td.format(a="right", s=rs, v="--"))
                     else:
-                        cells.append(f'<td style="padding:4px 8px;text-align:right;{rs}">--</td>')
+                        cells.append(_td.format(a="right", s=rs, v="--"))
 
                 rows_html.append(
                     f'<tr style="border-bottom:1px solid #E2E8F0">{"".join(cells)}</tr>'
@@ -819,7 +933,14 @@ def render() -> None:
             "粗利構成",
         ), use_container_width=True)
 
-    _display_comp_table(dept_table)
+    _display_comp_table(
+        dept_table,
+        df_pl=None,  # dept grouping not in store PL
+        df_budget_pl=None,
+        group_name_col="dept_name",
+        cur_ym=cur_ym,
+        store_ids=filters["store_ids"],
+    )
 
     # =====================================================================
     # Section 4: Store Composition
@@ -845,4 +966,11 @@ def render() -> None:
             "粗利構成",
         ), use_container_width=True)
 
-    _display_comp_table(store_table)
+    _display_comp_table(
+        store_table,
+        df_pl=df_pl,
+        df_budget_pl=df_budget_pl,
+        group_name_col="store_name",
+        cur_ym=cur_ym,
+        store_ids=filters["store_ids"],
+    )
