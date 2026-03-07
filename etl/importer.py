@@ -234,7 +234,7 @@ def _detect_items_by_periods(df_raw: pd.DataFrame) -> bool:
         return True
     # Also check first few rows for the "No." marker
     for i in range(min(5, len(df_raw))):
-        row_vals = [str(v).strip().lower() for v in df_raw.iloc[i].values[:3] if pd.notna(v)]
+        row_vals = [str(v).strip().lower() for v in df_raw.iloc[i].values[:6] if pd.notna(v)]
         if "no." in row_vals or "no" in row_vals:
             return True
     return False
@@ -263,6 +263,11 @@ def _reshape_items_by_periods(
 
     logger.info(f"Items by Periods: raw shape {df_all.shape}")
 
+    # Log first rows for debugging
+    for i in range(min(6, len(df_all))):
+        row_vals = [repr(v) for v in df_all.iloc[i].values[:6]]
+        logger.debug(f"Items by Periods row {i}: {row_vals}")
+
     # Find the header row containing "No." and the store_id row above it
     header_row_idx = None
     for i in range(min(10, len(df_all))):
@@ -276,31 +281,65 @@ def _reshape_items_by_periods(
             "Items by Periods形式のヘッダー行（No.列）が見つかりません"
         )
 
-    # Extract store_id from the row just above the header row
+    # Extract store_id from rows above the header row.
+    # Store ID may appear as:
+    #   - A standalone numeric cell (e.g., 1001 or 1001.0)
+    #   - Adjacent to a label like "Store Filter" (e.g., "Store Filter" | 1001)
+    #   - In any column of any metadata row above the "No." header
     store_id = None
-    if header_row_idx > 0:
-        for i in range(header_row_idx - 1, -1, -1):
-            candidate = df_all.iloc[i, 0]
-            if pd.notna(candidate):
-                val = str(candidate).strip()
-                # Store ID is typically numeric
-                if val.isdigit():
-                    store_id = val
-                    break
 
-    if store_id is None:
-        # Try second approach: look in cells for a numeric store id
-        for i in range(header_row_idx):
-            for j in range(min(4, df_all.shape[1])):
-                val = df_all.iloc[i, j]
-                if pd.notna(val) and str(val).strip().isdigit():
-                    store_id = str(val).strip()
-                    break
-            if store_id:
+    def _try_extract_store_id(val: Any) -> str | None:
+        """Try to extract a store ID (short numeric) from a cell value."""
+        if pd.isna(val):
+            return None
+        # Handle float (1001.0) and int (1001) from Excel
+        try:
+            num = float(val)
+            if num == int(num) and 1 <= int(num) <= 99999:
+                return str(int(num))
+        except (ValueError, TypeError, OverflowError):
+            pass
+        # Handle string digits
+        s = str(val).strip()
+        if s.isdigit() and 1 <= len(s) <= 5:
+            return s
+        return None
+
+    # Scan all metadata rows (above header) and all columns
+    for i in range(header_row_idx):
+        for j in range(df_all.shape[1]):
+            sid = _try_extract_store_id(df_all.iloc[i, j])
+            if sid:
+                store_id = sid
                 break
+        if store_id:
+            break
+
+    # If store_id not found in metadata rows, check if it's in the first
+    # data row (column 0) — some layouts put store_id as the first cell
+    # of each data row, or the header row IS row 0 with no metadata above.
+    if store_id is None and header_row_idx + 1 < len(df_all):
+        first_data = df_all.iloc[header_row_idx + 1, 0]
+        sid = _try_extract_store_id(first_data)
+        if sid:
+            store_id = sid
+            logger.info(f"Items by Periods: store_id={store_id} found in first data cell")
 
     if store_id is None:
-        raise ValueError("Items by Periods形式からstore_idを検出できません")
+        # Dump rows for debugging
+        debug_info = []
+        for i in range(min(header_row_idx + 2, len(df_all))):
+            row_vals = {
+                j: repr(df_all.iloc[i, j])
+                for j in range(min(8, df_all.shape[1]))
+                if pd.notna(df_all.iloc[i, j])
+            }
+            debug_info.append(f"row{i}: {row_vals}")
+        logger.warning(f"store_id detection failed. header_row={header_row_idx}, rows: {debug_info}")
+        raise ValueError(
+            f"Items by Periods形式からstore_idを検出できません。"
+            f" ヘッダー行={header_row_idx}, 行データ: {'; '.join(debug_info)}"
+        )
 
     logger.info(f"Items by Periods: detected store_id={store_id}, header_row={header_row_idx}")
 
@@ -335,18 +374,20 @@ def _reshape_items_by_periods(
     for col in headers:
         if col in fixed_cols or pd.isna(col):
             continue
+        # Excel may read date headers as datetime objects directly
+        if hasattr(col, "strftime"):
+            date_cols.append(col)
+            continue
+        if isinstance(col, pd.Timestamp):
+            date_cols.append(col)
+            continue
         col_str = str(col).strip()
-        # Try to parse as date (DD/MM/YY, or datetime from Excel)
+        # Try to parse as date (DD/MM/YY, or other formats)
         try:
             pd.to_datetime(col_str, dayfirst=True)
             date_cols.append(col)
         except (ValueError, TypeError):
-            # Also handle Excel datetime objects
-            try:
-                if hasattr(col, "strftime"):
-                    date_cols.append(col)
-            except Exception:
-                pass
+            pass
 
     if not date_cols:
         raise ValueError("Items by Periods形式の日付列が見つかりません")
