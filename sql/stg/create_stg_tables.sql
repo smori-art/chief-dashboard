@@ -215,6 +215,26 @@ CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_STG}.f_inventory_monthly` (
 PARTITION BY month_end_date
 CLUSTER BY store_id;
 
+-- Fact: Store P&L Monthly
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_STG}.f_store_pl_monthly` (
+    ym STRING NOT NULL,
+    store_id STRING NOT NULL,
+    net_sales NUMERIC,
+    cogs NUMERIC,
+    gross_profit NUMERIC,
+    gross_margin_pct NUMERIC,
+    personnel_expense NUMERIC,
+    rent_expense NUMERIC,
+    utility_expense NUMERIC,
+    depreciation_expense NUMERIC,
+    other_opex NUMERIC,
+    total_opex NUMERIC,
+    operating_profit NUMERIC,
+    operating_margin_pct NUMERIC,
+    _source_file STRING,
+    _imported_at TIMESTAMP
+);
+
 -- Fact: Waste & Discount Daily
 CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_STG}.f_waste_discount_daily` (
     date DATE NOT NULL,

@@ -626,6 +626,84 @@ def _generate_demo_waste_data() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _generate_demo_store_pl() -> pd.DataFrame:
+    """Generate demo store-level P&L data."""
+    np.random.seed(1200)
+    stores = [
+        ("S001", "バンコク中央店"),
+        ("S002", "チェンマイ店"),
+        ("S003", "パタヤ店"),
+        ("S004", "プーケット店"),
+    ]
+    yms = _generate_demo_dates(24)
+
+    rows = []
+    for ym in yms:
+        month = int(ym[5:7])
+        seasonal = 1.0 + 0.08 * np.sin(month * np.pi / 6)
+        for store_id, store_name in stores:
+            # Store size factor
+            size_factor = {"S001": 1.5, "S002": 0.8, "S003": 1.0, "S004": 0.7}[store_id]
+            net_sales = round(np.random.uniform(8_000_000, 15_000_000) * size_factor * seasonal, 2)
+            cogs_rate = np.random.uniform(0.65, 0.75)
+            cogs = round(net_sales * cogs_rate, 2)
+            gross_profit = round(net_sales - cogs, 2)
+
+            # Operating expenses
+            personnel = round(net_sales * np.random.uniform(0.08, 0.12), 2)
+            rent = round(np.random.uniform(200_000, 600_000) * size_factor, 2)
+            utility = round(np.random.uniform(80_000, 200_000) * size_factor, 2)
+            depreciation = round(np.random.uniform(50_000, 150_000) * size_factor, 2)
+            other = round(net_sales * np.random.uniform(0.02, 0.04), 2)
+            total_opex = personnel + rent + utility + depreciation + other
+            op_profit = round(gross_profit - total_opex, 2)
+
+            rows.append({
+                "ym": ym,
+                "store_id": store_id,
+                "store_name": store_name,
+                "net_sales": net_sales,
+                "cogs": cogs,
+                "gross_profit": gross_profit,
+                "gross_margin_pct": round(gross_profit / net_sales * 100, 1) if net_sales else 0,
+                "personnel_expense": personnel,
+                "rent_expense": rent,
+                "utility_expense": utility,
+                "depreciation_expense": depreciation,
+                "other_opex": other,
+                "total_opex": round(total_opex, 2),
+                "operating_profit": op_profit,
+                "operating_margin_pct": round(op_profit / net_sales * 100, 1) if net_sales else 0,
+                "personnel_ratio_pct": round(personnel / net_sales * 100, 1),
+                "rent_ratio_pct": round(rent / net_sales * 100, 1),
+                "utility_ratio_pct": round(utility / net_sales * 100, 1),
+                "depreciation_ratio_pct": round(depreciation / net_sales * 100, 1),
+                "other_opex_ratio_pct": round(other / net_sales * 100, 1),
+                "total_opex_ratio_pct": round(total_opex / net_sales * 100, 1),
+            })
+
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=300)
+def load_store_pl() -> pd.DataFrame:
+    """Load store-level P&L data."""
+    config = get_config()
+    client = _get_bq_client()
+    if client is not None:
+        query = f"""
+            SELECT * FROM `{config.gcp_project_id}.{config.bq_dataset_mart}.v_store_pl_monthly`
+            ORDER BY ym DESC, store_id
+        """
+        try:
+            df = client.query(query).to_dataframe()
+            if len(df) > 0:
+                return df
+        except Exception as e:
+            logger.warning(f"Store PL query failed, using demo data: {e}")
+    return _generate_demo_store_pl()
+
+
 @st.cache_data(ttl=60)
 def load_import_history() -> pd.DataFrame:
     """Load import audit log."""

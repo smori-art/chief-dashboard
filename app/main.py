@@ -165,13 +165,14 @@ def main() -> None:
         "Waste Analysis": "app.pages.waste_view",
         "Budget vs Actual": "app.pages.budget_view",
         "OOS Analysis": "app.pages.oos_analysis",
+        "Store PL": "app.pages.store_pl_view",
         "Import / Admin": "app.pages.import_admin",
         "Export / Report": "app.pages.export_report",
     }
 
     _NAV_GROUPS: list[tuple[str, list[str]]] = [
         ("概況", ["Executive Summary", "Alert Dashboard"]),
-        ("切口分析", ["Department View", "Store View", "Store x Department", "Product Analysis"]),
+        ("切口分析", ["Department View", "Store View", "Store x Department", "Product Analysis", "Store PL"]),
         ("深掘り", ["Timeband Analysis", "Daily Trend", "Basket Analysis",
                    "Discount Analysis", "Waste Analysis", "Budget vs Actual", "OOS Analysis"]),
         ("管理", ["Import / Admin", "Export / Report"]),
@@ -192,6 +193,7 @@ def main() -> None:
         "Waste Analysis": "ロス分析",
         "Budget vs Actual": "予実管理",
         "OOS Analysis": "欠品分析",
+        "Store PL": "店舗別PL",
         "Import / Admin": "インポート",
         "Export / Report": "レポート出力",
     }

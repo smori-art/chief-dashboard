@@ -295,6 +295,89 @@ sales_dept_timeband:
     - gross_sales_ex_tax
     - qty
 
+store_pl_monthly:
+  description: "月次・店舗別PL（損益計算書）"
+  target_table: "raw_store_pl_monthly"
+  stg_table: "f_store_pl_monthly"
+  columns:
+    ym:
+      - "年月"
+      - "ym"
+      - "対象月"
+      - "YM"
+      - "Period"
+    store_id:
+      - "店舗コード"
+      - "店舗ID"
+      - "store_id"
+      - "StoreCode"
+    store_name:
+      - "店舗名"
+      - "store_name"
+    net_sales:
+      - "売上高"
+      - "純売上"
+      - "実売上"
+      - "net_sales"
+      - "Revenue"
+    cogs:
+      - "売上原価"
+      - "原価"
+      - "cogs"
+      - "COGS"
+      - "Cost of Sales"
+    gross_profit:
+      - "粗利"
+      - "粗利益"
+      - "売上総利益"
+      - "gross_profit"
+      - "Gross Profit"
+    personnel_expense:
+      - "人件費"
+      - "personnel"
+      - "Labor Cost"
+      - "人件費合計"
+    rent_expense:
+      - "家賃"
+      - "賃借料"
+      - "rent"
+      - "Rent"
+    utility_expense:
+      - "水道光熱費"
+      - "光熱費"
+      - "utilities"
+      - "Utilities"
+    depreciation_expense:
+      - "減価償却費"
+      - "償却費"
+      - "depreciation"
+      - "Depreciation"
+    other_opex:
+      - "その他経費"
+      - "その他販管費"
+      - "other_opex"
+      - "Other Expenses"
+    operating_profit:
+      - "営業利益"
+      - "営業損益"
+      - "operating_profit"
+      - "Operating Profit"
+  required:
+    - ym
+    - store_id
+    - net_sales
+  date_columns: []
+  numeric_columns:
+    - net_sales
+    - cogs
+    - gross_profit
+    - personnel_expense
+    - rent_expense
+    - utility_expense
+    - depreciation_expense
+    - other_opex
+    - operating_profit
+
 master_store:
   description: "店舗マスタ"
   target_table: "raw_master_store"

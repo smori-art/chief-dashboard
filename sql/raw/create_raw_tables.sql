@@ -161,6 +161,31 @@ CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_RAW}.raw_master_product` (
     _row_number INT64
 );
 
+-- Raw: Store P&L Monthly (source type 8)
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_RAW}.raw_store_pl_monthly` (
+    ym STRING,
+    store_id STRING,
+    store_name STRING,
+    net_sales NUMERIC,
+    cogs NUMERIC,
+    gross_profit NUMERIC,
+    personnel_expense NUMERIC,
+    rent_expense NUMERIC,
+    utility_expense NUMERIC,
+    depreciation_expense NUMERIC,
+    other_opex NUMERIC,
+    operating_profit NUMERIC,
+    -- Audit columns
+    _source_file STRING NOT NULL,
+    _imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+    _imported_by STRING NOT NULL,
+    _file_checksum STRING NOT NULL,
+    _row_number INT64
+)
+OPTIONS (
+    description = 'Raw monthly store-level P&L from Excel import'
+);
+
 -- Import Audit Log
 CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET_RAW}.import_audit_log` (
     import_id STRING NOT NULL,
