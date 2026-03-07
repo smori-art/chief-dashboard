@@ -29,16 +29,16 @@ POSITIVE_BG = "#F0FDF4"     # green-50
 NEGATIVE_BG = "#FEF2F2"     # red-50
 NEUTRAL_BG = "#F8FAFC"      # slate-50
 
-# Chart color palette — muted / low-saturation tones
+# Chart color palette — soft muted tones (low saturation, mid brightness)
 COLORS = [
-    "#C4838F",  # muted rose
-    "#7BA3C9",  # muted blue
-    "#7BBF8E",  # muted green
-    "#C9B36A",  # muted gold
-    "#9E8DBF",  # muted violet
-    "#6FB5BF",  # muted teal
-    "#C49570",  # muted terracotta
-    "#B889A0",  # muted mauve
+    "#C9ADB2",  # dusty rose
+    "#A3BBCC",  # dusty blue
+    "#A3C5AA",  # sage green
+    "#C9C09A",  # sand gold
+    "#B5ADCC",  # dusty lavender
+    "#99BFC2",  # dusty teal
+    "#C4B09A",  # warm sand
+    "#C2A3B3",  # dusty plum
 ]
 
 # Keep backward-compatible alias
@@ -359,9 +359,9 @@ def chart_waterfall(
         text=[f"{v:+,.0f}" if i > 0 else f"{v:,.0f}"
               for i, v in enumerate(values)],
         connector={"line": {"color": BORDER}},
-        increasing={"marker": {"color": "#7BBF8E"}},
-        decreasing={"marker": {"color": "#C4838F"}},
-        totals={"marker": {"color": "#7BA3C9"}},
+        increasing={"marker": {"color": "#A3C5AA"}},
+        decreasing={"marker": {"color": "#C9ADB2"}},
+        totals={"marker": {"color": "#A3BBCC"}},
     ))
     fig.update_layout(
         title=title,

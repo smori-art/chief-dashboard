@@ -11,12 +11,16 @@ Displays:
 
 from __future__ import annotations
 
+import re
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from app.components import (
     COLORS,
+    NEGATIVE,
+    POSITIVE,
     TEXT_SECONDARY,
     chart_line_trend,
     filter_dataframe,
@@ -156,13 +160,15 @@ def _build_comp_table(
 
     result = pd.DataFrame()
     result["名称"] = cur[group_name_col]
-    # 1000THB unit, integer
-    result["売上(千฿)"] = (cur[sales_col].values / 1000).round(0).astype(int)
-    result["粗利(千฿)"] = (cur["gross_profit"].values / 1000).round(0).astype(int)
-    result["売上構成比"] = (cur[sales_col].values / total_sales * 100).round(0).astype(int)
-    result["粗利構成比"] = (cur["gross_profit"].values / total_profit * 100).round(0).astype(int)
+    # 1000THB unit, integer, with thousand separator as string
+    sales_k = (cur[sales_col].values / 1000).round(0).astype(int)
+    profit_k = (cur["gross_profit"].values / 1000).round(0).astype(int)
+    result["売上(千฿)"] = [f"{v:,}" for v in sales_k]
+    result["粗利(千฿)"] = [f"{v:,}" for v in profit_k]
+    result["売上構成比"] = [f"{v}%" for v in (cur[sales_col].values / total_sales * 100).round(0).astype(int)]
+    result["粗利構成比"] = [f"{v}%" for v in (cur["gross_profit"].values / total_profit * 100).round(0).astype(int)]
 
-    # Raw values for AI summary
+    # Raw values for AI summary and sorting
     result["_売上_raw"] = cur[sales_col].values
     result["_粗利_raw"] = cur["gross_profit"].values
 
@@ -189,6 +195,55 @@ def _build_comp_table(
     return result
 
 
+def _format_pct_cell(val) -> str:
+    """Format a percentage value with color: green >=100, red <100."""
+    if val is None or pd.isna(val):
+        return "--"
+    v = int(val)
+    color = POSITIVE if v >= 100 else NEGATIVE
+    return f'<span style="color:{color};font-weight:600">{v}%</span>'
+
+
+def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
+    """Render a composition table as colored HTML."""
+    amount_col = f"{prefix}(千฿)"
+    share_col = f"{prefix}構成比"
+    yoy_col = f"{prefix}前年比"
+    yoy2_col = f"{prefix}前々年比"
+    mom_col = f"{prefix}前月比"
+
+    header = f"<tr><th>名称</th><th>{amount_col}</th><th>構成比</th>"
+    header += "<th>前年比</th><th>前々年比</th><th>前月比</th></tr>"
+
+    rows = []
+    for _, r in df.iterrows():
+        row = f"<td>{r['名称']}</td>"
+        row += f"<td style='text-align:right'>{r.get(amount_col, '--')}</td>"
+        row += f"<td style='text-align:right'>{r.get(share_col, '--')}</td>"
+        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(yoy_col))}</td>"
+        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(yoy2_col))}</td>"
+        row += f"<td style='text-align:right'>{_format_pct_cell(r.get(mom_col))}</td>"
+        rows.append(f"<tr>{row}</tr>")
+
+    html = (
+        '<div style="overflow-x:auto">'
+        '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'
+        f"<thead style='background:#F1F5F9;color:#334155'>{header}</thead>"
+        "<tbody>" + "".join(rows) + "</tbody></table></div>"
+    )
+    # Add basic row borders via style
+    html = html.replace("<tr>", '<tr style="border-bottom:1px solid #E2E8F0">')
+    html = html.replace("<th>", '<th style="padding:6px 10px;text-align:left;font-weight:600">')
+    html = html.replace("<td", '<td style="padding:5px 10px"')
+    # Fix double style attrs
+    html = re.sub(
+        r'<td style="padding:5px 10px" style=\'text-align:right\'>',
+        '<td style="padding:5px 10px;text-align:right">',
+        html,
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
 def _display_comp_table(table: pd.DataFrame) -> None:
     """Display composition table in a compact two-tab layout (売上 / 粗利)."""
     if table.empty:
@@ -196,13 +251,9 @@ def _display_comp_table(table: pd.DataFrame) -> None:
 
     tab_sales, tab_profit = st.tabs(["売上", "粗利"])
     with tab_sales:
-        cols = ["名称", "売上(千฿)", "売上構成比", "売上前年比", "売上前々年比", "売上前月比"]
-        cols = [c for c in cols if c in table.columns]
-        st.dataframe(table[cols], use_container_width=True, hide_index=True)
+        _render_comp_html_table(table, "売上")
     with tab_profit:
-        cols = ["名称", "粗利(千฿)", "粗利構成比", "粗利前年比", "粗利前々年比", "粗利前月比"]
-        cols = [c for c in cols if c in table.columns]
-        st.dataframe(table[cols], use_container_width=True, hide_index=True)
+        _render_comp_html_table(table, "粗利")
 
 
 def _generate_ai_summary(
@@ -329,8 +380,8 @@ def render() -> None:
     hdr_left, hdr_right = st.columns([4, 1])
     with hdr_left:
         st.markdown(
-            '<p style="font-size:0.78rem;font-weight:700;color:#64748B;'
-            'letter-spacing:0.08em;margin-bottom:0">'
+            '<p style="font-size:1.1rem;font-weight:700;color:#475569;'
+            'letter-spacing:0.06em;margin-bottom:0">'
             'LOPIA JAPAN Thailand 月次ダッシュボード</p>',
             unsafe_allow_html=True,
         )
