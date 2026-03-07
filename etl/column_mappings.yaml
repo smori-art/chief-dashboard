@@ -24,6 +24,7 @@ sales_item_daily:
       - "store_id"
       - "StoreCode"
       - "Store ID"
+      - "Store"
     sku:
       - "商品コード"
       - "SKU"
@@ -31,10 +32,13 @@ sales_item_daily:
       - "商品CD"
       - "JAN"
       - "JANコード"
+      - "No."
+      - "No"
     product_name:
       - "商品名"
       - "product_name"
       - "品名"
+      - "Description"
     dept_name:
       - "部門"
       - "部門名"
@@ -61,6 +65,8 @@ sales_item_daily:
       - "売上金額(税抜)"
       - "gross_sales"
       - "Gross Sales"
+      - "Net Sales"
+      - "NetSales"
     qty:
       - "売上点数"
       - "数量"

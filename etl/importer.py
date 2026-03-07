@@ -217,18 +217,213 @@ def add_audit_columns(
     return df
 
 
-def read_excel_file(
+def _detect_items_by_periods(df_raw: pd.DataFrame) -> bool:
+    """Detect if the DataFrame is in 'Items by Periods' pivot format.
+
+    The format has metadata rows at the top:
+      Row 0: [store_id] [Net Sales] [Day] [Net Change] ...
+      Row 1: [No.]      [Description] [date1] [date2] ...
+      Row 2+: data rows
+    """
+    if df_raw.shape[0] < 3 or df_raw.shape[1] < 4:
+        return False
+    # Check if any column header or first-row values suggest the pivot format
+    cols_lower = [str(c).strip().lower() for c in df_raw.columns]
+    # Columns from the first Excel row become pandas headers
+    if any(x in cols_lower for x in ("store filter", "no.", "no")):
+        return True
+    # Also check first few rows for the "No." marker
+    for i in range(min(5, len(df_raw))):
+        row_vals = [str(v).strip().lower() for v in df_raw.iloc[i].values[:3] if pd.notna(v)]
+        if "no." in row_vals or "no" in row_vals:
+            return True
+    return False
+
+
+def _reshape_items_by_periods(
     file_content: bytes,
     filename: str,
 ) -> pd.DataFrame:
-    """Read Excel or CSV file content into DataFrame."""
+    """Reshape 'Items by Periods' pivot Excel into flat rows.
+
+    Input layout (Excel):
+      Row 1: Store Filter | Analysis Option | View by  | View as
+      Row 2: <store_id>   | Net Sales       | Day      | Net Change | (empty date cols)
+      Row 3: No.          | Description     | <date1>  | <date2>    | ...
+      Row 4+: <sku>       | <product_name>  | <value1> | <value2>   | ...
+
+    Output: flat DataFrame with columns [date, store_id, sku, product_name, gross_sales_ex_tax]
+    """
+    ext = Path(filename).suffix.lower()
+    # Read without header to inspect all rows
+    if ext == ".csv":
+        df_all = pd.read_csv(io.BytesIO(file_content), header=None)
+    else:
+        df_all = pd.read_excel(io.BytesIO(file_content), header=None)
+
+    logger.info(f"Items by Periods: raw shape {df_all.shape}")
+
+    # Find the header row containing "No." and the store_id row above it
+    header_row_idx = None
+    for i in range(min(10, len(df_all))):
+        row_vals = [str(v).strip() for v in df_all.iloc[i].values if pd.notna(v)]
+        if any(v.lower() in ("no.", "no") for v in row_vals):
+            header_row_idx = i
+            break
+
+    if header_row_idx is None:
+        raise ValueError(
+            "Items by Periods形式のヘッダー行（No.列）が見つかりません"
+        )
+
+    # Extract store_id from the row just above the header row
+    store_id = None
+    if header_row_idx > 0:
+        for i in range(header_row_idx - 1, -1, -1):
+            candidate = df_all.iloc[i, 0]
+            if pd.notna(candidate):
+                val = str(candidate).strip()
+                # Store ID is typically numeric
+                if val.isdigit():
+                    store_id = val
+                    break
+
+    if store_id is None:
+        # Try second approach: look in cells for a numeric store id
+        for i in range(header_row_idx):
+            for j in range(min(4, df_all.shape[1])):
+                val = df_all.iloc[i, j]
+                if pd.notna(val) and str(val).strip().isdigit():
+                    store_id = str(val).strip()
+                    break
+            if store_id:
+                break
+
+    if store_id is None:
+        raise ValueError("Items by Periods形式からstore_idを検出できません")
+
+    logger.info(f"Items by Periods: detected store_id={store_id}, header_row={header_row_idx}")
+
+    # Parse the header row to get column names
+    headers = df_all.iloc[header_row_idx].tolist()
+
+    # Data starts after header row
+    df_data = df_all.iloc[header_row_idx + 1:].copy()
+    df_data.columns = headers
+    df_data = df_data.reset_index(drop=True)
+
+    # Identify the SKU column ("No." or "No") and description column
+    sku_col = None
+    desc_col = None
+    for col in headers:
+        col_str = str(col).strip().lower()
+        if col_str in ("no.", "no"):
+            sku_col = col
+        elif col_str == "description":
+            desc_col = col
+
+    if sku_col is None:
+        raise ValueError("Items by Periods形式のNo.列が見つかりません")
+
+    # Date columns: everything after the first 2 columns (No., Description)
+    # that looks like a date
+    fixed_cols = [sku_col]
+    if desc_col:
+        fixed_cols.append(desc_col)
+
+    date_cols = []
+    for col in headers:
+        if col in fixed_cols or pd.isna(col):
+            continue
+        col_str = str(col).strip()
+        # Try to parse as date (DD/MM/YY, or datetime from Excel)
+        try:
+            pd.to_datetime(col_str, dayfirst=True)
+            date_cols.append(col)
+        except (ValueError, TypeError):
+            # Also handle Excel datetime objects
+            try:
+                if hasattr(col, "strftime"):
+                    date_cols.append(col)
+            except Exception:
+                pass
+
+    if not date_cols:
+        raise ValueError("Items by Periods形式の日付列が見つかりません")
+
+    logger.info(f"Items by Periods: {len(date_cols)} date columns found")
+
+    # Filter out rows where SKU is not valid (summary rows, empty rows)
+    df_data = df_data[df_data[sku_col].notna()].copy()
+    df_data = df_data[
+        df_data[sku_col].apply(lambda x: str(x).strip() != "" and str(x).strip().lower() != "total")
+    ].copy()
+
+    # Melt (unpivot) date columns into rows
+    id_vars = [c for c in fixed_cols if c in df_data.columns]
+    df_melted = df_data.melt(
+        id_vars=id_vars,
+        value_vars=date_cols,
+        var_name="date",
+        value_name="gross_sales_ex_tax",
+    )
+
+    # Convert date column (DD/MM/YY format)
+    df_melted["date"] = pd.to_datetime(
+        df_melted["date"], dayfirst=True, format="mixed",
+    )
+
+    # Add store_id
+    df_melted["store_id"] = store_id
+
+    # Rename columns to target schema
+    rename_map = {sku_col: "sku"}
+    if desc_col:
+        rename_map[desc_col] = "product_name"
+    df_melted = df_melted.rename(columns=rename_map)
+
+    # Clean up gross_sales_ex_tax: handle commas and convert to numeric
+    df_melted["gross_sales_ex_tax"] = (
+        df_melted["gross_sales_ex_tax"]
+        .apply(lambda x: str(x).replace(",", "") if pd.notna(x) else x)
+    )
+    df_melted["gross_sales_ex_tax"] = pd.to_numeric(
+        df_melted["gross_sales_ex_tax"], errors="coerce"
+    ).fillna(0.0)
+
+    # Convert sku to string
+    df_melted["sku"] = df_melted["sku"].apply(
+        lambda x: str(int(x)) if isinstance(x, float) and not pd.isna(x) else str(x).strip()
+    )
+
+    logger.info(f"Items by Periods: reshaped to {len(df_melted)} rows")
+    return df_melted
+
+
+def read_excel_file(
+    file_content: bytes,
+    filename: str,
+    source_type: str | None = None,
+) -> pd.DataFrame:
+    """Read Excel or CSV file content into DataFrame.
+
+    For 'sales_item_daily' source type, auto-detects and reshapes
+    'Items by Periods' pivot format.
+    """
     ext = Path(filename).suffix.lower()
     if ext == ".csv":
-        return pd.read_csv(io.BytesIO(file_content))
+        df = pd.read_csv(io.BytesIO(file_content))
     elif ext in (".xlsx", ".xls"):
-        return pd.read_excel(io.BytesIO(file_content))
+        df = pd.read_excel(io.BytesIO(file_content))
     else:
         raise ValueError(f"未対応のファイル形式: {ext}")
+
+    # Auto-detect Items by Periods pivot format for sales_item_daily
+    if source_type == "sales_item_daily" and _detect_items_by_periods(df):
+        logger.info("Detected 'Items by Periods' pivot format – reshaping")
+        return _reshape_items_by_periods(file_content, filename)
+
+    return df
 
 
 def process_import(
@@ -275,9 +470,9 @@ def process_import(
     target_table = source_config["target_table"]
 
     try:
-        # Step 1: Read file
+        # Step 1: Read file (with pivot auto-detection for sales_item_daily)
         logger.info(f"Reading file: {filename}")
-        df_raw = read_excel_file(file_content, filename)
+        df_raw = read_excel_file(file_content, filename, source_type=source_type)
         logger.info(f"Read {len(df_raw)} rows from {filename}")
 
         # Step 2: Resolve columns
