@@ -272,6 +272,7 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
     """Render a composition table as colored HTML."""
     amount_col = f"{prefix}(千฿)"
     share_col = f"{prefix}構成比"
+    raw_col = f"_{prefix}_raw"
     comp_cols = [
         (f"{prefix}予算比", "予算比"),
         (f"{prefix}前年比", "前年比"),
@@ -280,19 +281,49 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
         (f"{prefix}前々月比", "前々月比"),
     ]
 
-    header = f"<tr><th>名称</th><th>{amount_col}</th><th>構成比</th>"
+    _th_l = '<th style="padding:6px 10px;text-align:left;font-weight:600">'
+    _th_r = '<th style="padding:6px 10px;text-align:right;font-weight:600">'
+    header = f"<tr>{_th_l}名称</th>{_th_r}{amount_col}</th>{_th_r}構成比</th>"
     for _, lbl in comp_cols:
-        header += f"<th>{lbl}</th>"
+        header += f"{_th_r}{lbl}</th>"
     header += "</tr>"
+
+    _td_l = '<td style="padding:5px 10px">'
+    _td_r = '<td style="padding:5px 10px;text-align:right">'
 
     rows = []
     for _, r in df.iterrows():
-        row = f"<td>{r['名称']}</td>"
-        row += f"<td style='text-align:right'>{r.get(amount_col, '--')}</td>"
-        row += f"<td style='text-align:right'>{r.get(share_col, '--')}</td>"
+        row = f"{_td_l}{r['名称']}</td>"
+        row += f"{_td_r}{r.get(amount_col, '--')}</td>"
+        row += f"{_td_r}{r.get(share_col, '--')}</td>"
         for col_key, _ in comp_cols:
-            row += f"<td style='text-align:right'>{_format_pct_cell(r.get(col_key))}</td>"
+            row += f"{_td_r}{_format_pct_cell(r.get(col_key))}</td>"
         rows.append(f"<tr>{row}</tr>")
+
+    # Totals row
+    if raw_col in df.columns:
+        total_raw = df[raw_col].sum()
+        total_k = int(round(total_raw / 1000))
+        total_row = (
+            f'{_td_l}<b>合計</b></td>'
+            f'{_td_r}<b>{total_k:,}</b></td>'
+            f'{_td_r}<b>100%</b></td>'
+        )
+        for col_key, _ in comp_cols:
+            vals = df[col_key].dropna()
+            if not vals.empty:
+                # Weighted average using raw values
+                weights = df.loc[vals.index, raw_col]
+                if weights.sum() > 0:
+                    wavg = int(round((vals * weights).sum() / weights.sum()))
+                    total_row += f"{_td_r}{_format_pct_cell(wavg)}</td>"
+                else:
+                    total_row += f"{_td_r}--</td>"
+            else:
+                total_row += f"{_td_r}--</td>"
+        rows.append(
+            f'<tr style="border-top:2px solid #CBD5E1;background:#F8FAFC">{total_row}</tr>'
+        )
 
     html = (
         '<div style="overflow-x:auto">'
@@ -301,13 +332,6 @@ def _render_comp_html_table(df: pd.DataFrame, prefix: str) -> None:
         "<tbody>" + "".join(rows) + "</tbody></table></div>"
     )
     html = html.replace("<tr>", '<tr style="border-bottom:1px solid #E2E8F0">')
-    html = html.replace("<th>", '<th style="padding:6px 10px;text-align:left;font-weight:600">')
-    html = html.replace("<td", '<td style="padding:5px 10px"')
-    html = re.sub(
-        r'<td style="padding:5px 10px" style=\'text-align:right\'>',
-        '<td style="padding:5px 10px;text-align:right">',
-        html,
-    )
     st.markdown(html, unsafe_allow_html=True)
 
 
@@ -373,19 +397,49 @@ def _build_pl_comp_table(
 def _render_pl_comp_html_table(df: pd.DataFrame) -> None:
     """Render a PL composition table as colored HTML."""
     comp_labels = ["予算比", "前年比", "前々年比", "前月比", "前々月比"]
-    header = "<tr><th>名称</th><th>金額(千฿)</th><th>対売上比</th>"
+
+    _th_l = '<th style="padding:6px 10px;text-align:left;font-weight:600">'
+    _th_r = '<th style="padding:6px 10px;text-align:right;font-weight:600">'
+    _td_l = '<td style="padding:5px 10px">'
+    _td_r = '<td style="padding:5px 10px;text-align:right">'
+
+    header = f"<tr>{_th_l}名称</th>{_th_r}金額(千฿)</th>{_th_r}対売上比</th>"
     for lbl in comp_labels:
-        header += f"<th>{lbl}</th>"
+        header += f"{_th_r}{lbl}</th>"
     header += "</tr>"
 
     rows = []
     for _, r in df.iterrows():
-        row = f"<td>{r['名称']}</td>"
-        row += f"<td style='text-align:right'>{r.get('金額(千฿)', '--')}</td>"
-        row += f"<td style='text-align:right'>{r.get('対売上比', '--')}</td>"
+        row = f"{_td_l}{r['名称']}</td>"
+        row += f"{_td_r}{r.get('金額(千฿)', '--')}</td>"
+        row += f"{_td_r}{r.get('対売上比', '--')}</td>"
         for lbl in comp_labels:
-            row += f"<td style='text-align:right'>{_format_pct_cell(r.get(lbl))}</td>"
+            row += f"{_td_r}{_format_pct_cell(r.get(lbl))}</td>"
         rows.append(f"<tr>{row}</tr>")
+
+    # Totals row
+    if "_raw" in df.columns:
+        total_raw = df["_raw"].sum()
+        total_k = int(round(total_raw / 1000))
+        total_row = (
+            f'{_td_l}<b>合計</b></td>'
+            f'{_td_r}<b>{total_k:,}</b></td>'
+            f'{_td_r}--</td>'
+        )
+        for lbl in comp_labels:
+            vals = df[lbl].dropna()
+            if not vals.empty:
+                weights = df.loc[vals.index, "_raw"].abs()
+                if weights.sum() > 0:
+                    wavg = int(round((vals * weights).sum() / weights.sum()))
+                    total_row += f"{_td_r}{_format_pct_cell(wavg)}</td>"
+                else:
+                    total_row += f"{_td_r}--</td>"
+            else:
+                total_row += f"{_td_r}--</td>"
+        rows.append(
+            f'<tr style="border-top:2px solid #CBD5E1;background:#F8FAFC">{total_row}</tr>'
+        )
 
     html = (
         '<div style="overflow-x:auto">'
@@ -394,13 +448,6 @@ def _render_pl_comp_html_table(df: pd.DataFrame) -> None:
         "<tbody>" + "".join(rows) + "</tbody></table></div>"
     )
     html = html.replace("<tr>", '<tr style="border-bottom:1px solid #E2E8F0">')
-    html = html.replace("<th>", '<th style="padding:6px 10px;text-align:left;font-weight:600">')
-    html = html.replace("<td", '<td style="padding:5px 10px"')
-    html = re.sub(
-        r'<td style="padding:5px 10px" style=\'text-align:right\'>',
-        '<td style="padding:5px 10px;text-align:right">',
-        html,
-    )
     st.markdown(html, unsafe_allow_html=True)
 
 
@@ -416,7 +463,11 @@ def _display_comp_table(
     if table.empty:
         return
 
-    tab_labels = ["売上", "粗利", "営業利益", "人件費", "販管費", "家賃", "減価償却費"]
+    has_pl = df_pl is not None and store_ids
+    if has_pl:
+        tab_labels = ["売上", "粗利", "営業利益", "人件費", "販管費", "家賃", "減価償却費"]
+    else:
+        tab_labels = ["売上", "粗利"]
     tabs = st.tabs(tab_labels)
 
     with tabs[0]:
@@ -424,7 +475,7 @@ def _display_comp_table(
     with tabs[1]:
         _render_comp_html_table(table, "粗利")
 
-    if df_pl is not None and store_ids:
+    if has_pl:
         pl_tab_metrics = [
             ("operating_profit", 2),
             ("personnel_expense", 3),
@@ -442,120 +493,6 @@ def _display_comp_table(
                 else:
                     st.info("データがありません")
 
-
-def _generate_ai_summary(
-    agg_cur: dict, agg_yoy: dict | None, agg_yoy2: dict | None,
-    agg_mom: dict | None,
-    dept_table: pd.DataFrame, store_table: pd.DataFrame,
-    sales_label: str, cur_ym: str,
-) -> str:
-    """Generate an extended text summary of the current period performance."""
-    lines: list[str] = []
-
-    # Header
-    y, m = cur_ym.split("-")
-    lines.append(f"### {y}年{int(m)}月 全社概況\n")
-
-    # Overall sales
-    sales = agg_cur["sales"]
-    lines.append(f"当月の{sales_label}（税抜）は **฿{sales:,.0f}** となりました。")
-
-    if agg_yoy:
-        yoy_pct = sales / agg_yoy["sales"] * 100 if agg_yoy["sales"] else 0
-        yoy_diff = sales - agg_yoy["sales"]
-        direction = "増収" if yoy_pct >= 100 else "減収"
-        lines.append(
-            f"前年同月比では **{yoy_pct:.1f}%**（{direction}、差額 ฿{yoy_diff:+,.0f}）となっており、"
-            f"{'堅調な成長を維持しています。' if yoy_pct >= 100 else '前年を下回る結果となりました。'}"
-        )
-    if agg_yoy2:
-        yoy2_pct = sales / agg_yoy2["sales"] * 100 if agg_yoy2["sales"] else 0
-        lines.append(
-            f"前々年同月比では **{yoy2_pct:.1f}%** であり、"
-            f"{'中長期的にも成長基調にあります。' if yoy2_pct >= 100 else '2年前の水準を回復できていない状況です。'}"
-        )
-    if agg_mom:
-        mom_pct = sales / agg_mom["sales"] * 100 if agg_mom["sales"] else 0
-        lines.append(
-            f"前月比では **{mom_pct:.1f}%** "
-            f"{'と前月から伸長しました。' if mom_pct >= 100 else 'と前月から減少しています。'}"
-        )
-
-    lines.append("")
-
-    # Margin
-    margin = agg_cur["margin"]
-    lines.append(f"粗利率は **{margin:.1f}%** です。")
-    if agg_yoy:
-        margin_diff = margin - agg_yoy["margin"]
-        direction = "改善" if margin_diff >= 0 else "悪化"
-        lines.append(
-            f"前年同月の粗利率 {agg_yoy['margin']:.1f}% と比較して "
-            f"**{margin_diff:+.1f}pt** の{direction}となっています。"
-        )
-
-    # Discount
-    disc = agg_cur["discount_rate"]
-    lines.append(f"値引率は **{disc:.1f}%** です。")
-    if agg_yoy:
-        disc_diff = disc - agg_yoy["discount_rate"]
-        if abs(disc_diff) >= 0.1:
-            lines.append(
-                f"前年比 {disc_diff:+.1f}pt であり、"
-                f"{'値引コントロールが課題です。' if disc_diff > 0 else '値引の適正化が進んでいます。'}"
-            )
-
-    lines.append("")
-
-    # Unit price & basket
-    unit_price = agg_cur["unit_price"]
-    basket = agg_cur["basket"]
-    receipts = int(agg_cur["receipts"])
-    lines.append(
-        f"客単価は **฿{basket:,.0f}**、商品販売単価は **฿{unit_price:,.0f}**、"
-        f"レシート件数は **{receipts:,}件** です。"
-    )
-    if agg_yoy:
-        basket_pct = basket / agg_yoy["basket"] * 100 if agg_yoy["basket"] else 0
-        up_pct = unit_price / agg_yoy["unit_price"] * 100 if agg_yoy["unit_price"] else 0
-        rcpt_pct = receipts / agg_yoy["receipts"] * 100 if agg_yoy["receipts"] else 0
-        lines.append(
-            f"客単価は前年比 {basket_pct:.0f}%、"
-            f"商品販売単価は前年比 {up_pct:.0f}%、"
-            f"レシート件数は前年比 {rcpt_pct:.0f}% です。"
-        )
-
-    lines.append("")
-
-    # Department highlights
-    if not dept_table.empty and "売上前年比" in dept_table.columns:
-        valid = dept_table.dropna(subset=["売上前年比"])
-        if not valid.empty:
-            best = valid.loc[valid["売上前年比"].idxmax()]
-            worst = valid.loc[valid["売上前年比"].idxmin()]
-            lines.append(
-                f"**【部門別注目ポイント】** "
-                f"前年比で最も好調なのは **{best['名称']}**（前年比 {int(best['売上前年比'])}%）で、"
-                f"全社の成長を牽引しています。"
-                f"一方、**{worst['名称']}**（前年比 {int(worst['売上前年比'])}%）は課題があり、"
-                f"要因分析と対策立案が求められます。"
-            )
-
-    # Store highlights
-    if not store_table.empty and "売上前年比" in store_table.columns:
-        valid = store_table.dropna(subset=["売上前年比"])
-        if not valid.empty:
-            best = valid.loc[valid["売上前年比"].idxmax()]
-            worst = valid.loc[valid["売上前年比"].idxmin()]
-            lines.append(
-                f"**【店舗別注目ポイント】** "
-                f"**{best['名称']}**（前年比 {int(best['売上前年比'])}%）が最も伸長しており、"
-                f"好事例として他店舗への横展開を検討すべきです。"
-                f"**{worst['名称']}**（前年比 {int(worst['売上前年比'])}%）は低調であり、"
-                f"改善施策の優先的な投入が望まれます。"
-            )
-
-    return "\n\n".join(lines)
 
 
 # ── Main render ──────────────────────────────────────────────────────────
@@ -733,15 +670,24 @@ def render() -> None:
         pl_budget = _agg_pl(df_budget_pl, cur_ym, filters["store_ids"]) if not df_budget_pl.empty else None
 
         if pl_cur is not None:
+            # Cost ratio keys: lower is better (invert badge color)
+            _cost_ratio_keys = {
+                "personnel_ratio_pct", "rent_ratio_pct",
+                "total_opex_ratio_pct", "depreciation_ratio_pct",
+            }
+
             def _ratio_comps(key: str) -> list[dict]:
                 """For ratio KPIs, show pt difference instead of percentage."""
+                invert = key in _cost_ratio_keys
                 comps = []
                 for lbl, ref in [("前年", pl_yoy), ("前々年", pl_yoy2), ("前月", pl_mom), ("予算", pl_budget)]:
                     if ref is None:
                         comps.append({"label": lbl, "value": None})
                     else:
                         diff = pl_cur[key] - ref[key]
-                        comps.append({"label": lbl, "value": 100 + diff})
+                        # For cost ratios, invert: negative diff = good (show as >=100)
+                        badge_val = 100 - diff if invert else 100 + diff
+                        comps.append({"label": lbl, "value": badge_val})
                 return comps
 
             st.divider()
@@ -802,6 +748,11 @@ def render() -> None:
             ]
 
             ratio_keys = {"gross_margin_pct", "operating_margin_pct"}
+            # Cost items: higher = worse (color inverted)
+            cost_keys = {
+                "cogs", "personnel_expense", "rent_expense", "utility_expense",
+                "depreciation_expense", "other_opex", "total_opex",
+            }
 
             # ── Header ──
             th = '<th style="padding:6px 8px;text-align:{a};font-weight:600;' \
@@ -837,6 +788,7 @@ def render() -> None:
                     cells.append(_td.format(a="right", s=rs, v=f"¥{jpy_k:,.0f}"))
 
                 # Comparison ratios only
+                is_cost = key in cost_keys
                 for lbl, ref in pl_comparisons:
                     ref_val = ref[key] if ref else None
                     if cur_val is not None and ref_val is not None:
@@ -849,7 +801,11 @@ def render() -> None:
                             ))
                         elif ref_val != 0:
                             pct = cur_val / ref_val * 100
-                            color = POSITIVE if pct >= 100 else NEGATIVE
+                            # Cost items: lower is better (invert color)
+                            if is_cost:
+                                color = POSITIVE if pct <= 100 else NEGATIVE
+                            else:
+                                color = POSITIVE if pct >= 100 else NEGATIVE
                             cells.append(_td.format(
                                 a="right", s=rs,
                                 v=f'<span style="color:{color};font-weight:600">{pct:.1f}%</span>',
