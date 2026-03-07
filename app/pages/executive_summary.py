@@ -28,7 +28,7 @@ from app.components import (
     render_kpi_card,
     render_sidebar_filters,
 )
-from app.data import load_forecast, load_sales_monthly
+from app.data import load_forecast, load_sales_monthly, load_store_pl
 
 APP_VERSION = "v1.2.0"
 
@@ -193,6 +193,48 @@ def _build_comp_table(
 
     result = result.sort_values("_売上_raw", ascending=False)
     return result
+
+
+def _agg_pl(
+    df_pl: pd.DataFrame, ym: str, store_ids: list,
+) -> dict | None:
+    """Aggregate store PL data to company level for a given period."""
+    sub = df_pl[(df_pl["ym"] == ym) & (df_pl["store_id"].isin(store_ids))]
+    if sub.empty:
+        return None
+    t = sub.agg({
+        "net_sales": "sum",
+        "cogs": "sum",
+        "gross_profit": "sum",
+        "personnel_expense": "sum",
+        "rent_expense": "sum",
+        "utility_expense": "sum",
+        "depreciation_expense": "sum",
+        "other_opex": "sum",
+        "total_opex": "sum",
+        "operating_profit": "sum",
+    })
+    ns = t["net_sales"]
+    return {
+        "net_sales": ns,
+        "cogs": t["cogs"],
+        "gross_profit": t["gross_profit"],
+        "gross_margin_pct": (t["gross_profit"] / ns * 100) if ns else 0,
+        "personnel_expense": t["personnel_expense"],
+        "rent_expense": t["rent_expense"],
+        "utility_expense": t["utility_expense"],
+        "depreciation_expense": t["depreciation_expense"],
+        "other_opex": t["other_opex"],
+        "total_opex": t["total_opex"],
+        "operating_profit": t["operating_profit"],
+        "operating_margin_pct": (t["operating_profit"] / ns * 100) if ns else 0,
+        "personnel_ratio_pct": (t["personnel_expense"] / ns * 100) if ns else 0,
+        "rent_ratio_pct": (t["rent_expense"] / ns * 100) if ns else 0,
+        "utility_ratio_pct": (t["utility_expense"] / ns * 100) if ns else 0,
+        "depreciation_ratio_pct": (t["depreciation_expense"] / ns * 100) if ns else 0,
+        "other_opex_ratio_pct": (t["other_opex"] / ns * 100) if ns else 0,
+        "total_opex_ratio_pct": (t["total_opex"] / ns * 100) if ns else 0,
+    }
 
 
 def _format_pct_cell(val) -> str:
@@ -541,6 +583,171 @@ def render() -> None:
             label="売上点数", value=int(agg_cur["qty"]),
             comparisons=_comps("qty"), sparkline=sparks["qty"],
         )
+
+    # =====================================================================
+    # Section 1.5: PL-based KPI Cards + Company P&L Table
+    # =====================================================================
+    df_pl = load_store_pl()
+    if not df_pl.empty:
+        pl_cur = _agg_pl(df_pl, cur_ym, filters["store_ids"])
+        pl_yoy = _agg_pl(df_pl, _shift_ym(cur_ym, years=-1), filters["store_ids"])
+        pl_yoy2 = _agg_pl(df_pl, _shift_ym(cur_ym, years=-2), filters["store_ids"])
+        pl_mom = _agg_pl(df_pl, _shift_ym(cur_ym, months=-1), filters["store_ids"])
+        pl_mom2 = _agg_pl(df_pl, _shift_ym(cur_ym, months=-2), filters["store_ids"])
+
+        if pl_cur is not None:
+            def _pl_comps(key: str) -> list[dict]:
+                return [
+                    {"label": "前年", "value": _pct(pl_cur[key], pl_yoy[key] if pl_yoy else None)},
+                    {"label": "前々年", "value": _pct(pl_cur[key], pl_yoy2[key] if pl_yoy2 else None)},
+                    {"label": "前月", "value": _pct(pl_cur[key], pl_mom[key] if pl_mom else None)},
+                ]
+
+            def _ratio_comps(key: str) -> list[dict]:
+                """For ratio KPIs, show pt difference instead of percentage."""
+                comps = []
+                for lbl, ref in [("前年", pl_yoy), ("前々年", pl_yoy2), ("前月", pl_mom)]:
+                    if ref is None:
+                        comps.append({"label": lbl, "value": None})
+                    else:
+                        diff = pl_cur[key] - ref[key]
+                        # Use 100+diff so positive diff shows as ▲, negative as ▼
+                        comps.append({"label": lbl, "value": 100 + diff})
+                return comps
+
+            st.divider()
+            st.subheader("PL指標")
+            pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+            with pc1:
+                render_kpi_card(
+                    label="営業利益率", value=pl_cur["operating_margin_pct"],
+                    suffix="%", fmt=".1f", comparisons=_ratio_comps("operating_margin_pct"),
+                )
+            with pc2:
+                render_kpi_card(
+                    label="人件費率", value=pl_cur["personnel_ratio_pct"],
+                    suffix="%", fmt=".1f", comparisons=_ratio_comps("personnel_ratio_pct"),
+                )
+            with pc3:
+                render_kpi_card(
+                    label="販管費比率", value=pl_cur["total_opex_ratio_pct"],
+                    suffix="%", fmt=".1f", comparisons=_ratio_comps("total_opex_ratio_pct"),
+                )
+            with pc4:
+                render_kpi_card(
+                    label="家賃比率", value=pl_cur["rent_ratio_pct"],
+                    suffix="%", fmt=".1f", comparisons=_ratio_comps("rent_ratio_pct"),
+                )
+            with pc5:
+                render_kpi_card(
+                    label="減価償却費比率", value=pl_cur["depreciation_ratio_pct"],
+                    suffix="%", fmt=".1f", comparisons=_ratio_comps("depreciation_ratio_pct"),
+                )
+
+            # ── Company-wide P&L Table ────────────────────────────────────
+            st.divider()
+            st.subheader("全社PL")
+
+            pl_periods = [
+                ("当期", pl_cur),
+                ("前年", pl_yoy),
+                ("前々年", pl_yoy2),
+                ("前月", pl_mom),
+                ("前々月", pl_mom2),
+            ]
+
+            pl_line_items = [
+                ("売上高", "net_sales"),
+                ("売上原価", "cogs"),
+                ("粗利益", "gross_profit"),
+                ("粗利率", "gross_margin_pct"),
+                ("人件費", "personnel_expense"),
+                ("家賃", "rent_expense"),
+                ("水道光熱費", "utility_expense"),
+                ("減価償却費", "depreciation_expense"),
+                ("その他経費", "other_opex"),
+                ("販管費合計", "total_opex"),
+                ("営業利益", "operating_profit"),
+                ("営業利益率", "operating_margin_pct"),
+            ]
+
+            ratio_keys = {"gross_margin_pct", "operating_margin_pct"}
+
+            # Build header
+            header_cols = ["科目", "当期"]
+            for lbl, _ in pl_periods[1:]:
+                header_cols.extend([lbl, f"{lbl}比"])
+            header_html = "".join(
+                f'<th style="padding:6px 10px;text-align:{"left" if i == 0 else "right"};'
+                f'font-weight:600">{c}</th>'
+                for i, c in enumerate(header_cols)
+            )
+
+            # Build rows
+            rows_html = []
+            for item_name, key in pl_line_items:
+                is_ratio = key in ratio_keys
+                is_subtotal = key in {"gross_profit", "total_opex", "operating_profit"}
+
+                row_style = 'font-weight:600;background:#F8FAFC' if is_subtotal else ''
+                cells = [f'<td style="padding:5px 10px;{row_style}">{item_name}</td>']
+
+                cur_val = pl_cur[key] if pl_cur else None
+
+                # Current period value
+                if cur_val is not None:
+                    if is_ratio:
+                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">{cur_val:.1f}%</td>')
+                    else:
+                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">฿{cur_val:,.0f}</td>')
+                else:
+                    cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+
+                # Comparison periods
+                for lbl, ref in pl_periods[1:]:
+                    ref_val = ref[key] if ref else None
+                    # Absolute value
+                    if ref_val is not None:
+                        if is_ratio:
+                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">{ref_val:.1f}%</td>')
+                        else:
+                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">฿{ref_val:,.0f}</td>')
+                    else:
+                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+
+                    # Ratio comparison
+                    if cur_val is not None and ref_val is not None:
+                        if is_ratio:
+                            diff = cur_val - ref_val
+                            color = POSITIVE if diff >= 0 else NEGATIVE
+                            cells.append(
+                                f'<td style="padding:5px 10px;text-align:right;{row_style}">'
+                                f'<span style="color:{color};font-weight:600">{diff:+.1f}pt</span></td>'
+                            )
+                        elif ref_val != 0:
+                            pct = cur_val / ref_val * 100
+                            color = POSITIVE if pct >= 100 else NEGATIVE
+                            cells.append(
+                                f'<td style="padding:5px 10px;text-align:right;{row_style}">'
+                                f'<span style="color:{color};font-weight:600">{pct:.1f}%</span></td>'
+                            )
+                        else:
+                            cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+                    else:
+                        cells.append(f'<td style="padding:5px 10px;text-align:right;{row_style}">--</td>')
+
+                rows_html.append(
+                    f'<tr style="border-bottom:1px solid #E2E8F0">{"".join(cells)}</tr>'
+                )
+
+            pl_html = (
+                '<div style="overflow-x:auto">'
+                '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'
+                f'<thead style="background:#F1F5F9;color:#334155">'
+                f'<tr style="border-bottom:1px solid #E2E8F0">{header_html}</tr></thead>'
+                f'<tbody>{"".join(rows_html)}</tbody></table></div>'
+            )
+            st.markdown(pl_html, unsafe_allow_html=True)
 
     # =====================================================================
     # Section 2: Monthly Trend (immediately below KPIs)
