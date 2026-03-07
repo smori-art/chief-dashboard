@@ -29,16 +29,16 @@ POSITIVE_BG = "#F0FDF4"     # green-50
 NEGATIVE_BG = "#FEF2F2"     # red-50
 NEUTRAL_BG = "#F8FAFC"      # slate-50
 
-# Chart color palette — pastel / light tones
+# Chart color palette — muted / low-saturation tones
 COLORS = [
-    "#E8A0B0",  # 淡臙脂
-    "#93C5FD",  # light blue
-    "#86EFAC",  # light green
-    "#FCD34D",  # light yellow
-    "#C4B5FD",  # light violet
-    "#67E8F9",  # light cyan
-    "#FDBA74",  # light orange
-    "#F9A8D4",  # light pink
+    "#C4838F",  # muted rose
+    "#7BA3C9",  # muted blue
+    "#7BBF8E",  # muted green
+    "#C9B36A",  # muted gold
+    "#9E8DBF",  # muted violet
+    "#6FB5BF",  # muted teal
+    "#C49570",  # muted terracotta
+    "#B889A0",  # muted mauve
 ]
 
 # Keep backward-compatible alias
@@ -312,6 +312,8 @@ def chart_line_trend(
     color_col: str | None = None,
     title: str = "",
     y_title: str = "",
+    x_tick_format: str | None = None,
+    x_dtick: str | None = None,
 ) -> go.Figure:
     """Create a line chart for trend analysis."""
     fig = px.line(
@@ -323,8 +325,13 @@ def chart_line_trend(
         markers=True,
         color_discrete_sequence=COLORS_GRAY,
     )
+    xaxis_opts: dict = {"title": ""}
+    if x_tick_format:
+        xaxis_opts["tickformat"] = x_tick_format
+    if x_dtick:
+        xaxis_opts["dtick"] = x_dtick
     fig.update_layout(
-        xaxis_title="",
+        xaxis=xaxis_opts,
         yaxis_title=y_title,
         height=400,
         **_CHART_LAYOUT,
@@ -352,9 +359,9 @@ def chart_waterfall(
         text=[f"{v:+,.0f}" if i > 0 else f"{v:,.0f}"
               for i, v in enumerate(values)],
         connector={"line": {"color": BORDER}},
-        increasing={"marker": {"color": "#86EFAC"}},
-        decreasing={"marker": {"color": "#FCA5A5"}},
-        totals={"marker": {"color": "#E8A0B0"}},
+        increasing={"marker": {"color": "#7BBF8E"}},
+        decreasing={"marker": {"color": "#C4838F"}},
+        totals={"marker": {"color": "#7BA3C9"}},
     ))
     fig.update_layout(
         title=title,
