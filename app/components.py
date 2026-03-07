@@ -29,14 +29,16 @@ POSITIVE_BG = "#F0FDF4"     # green-50
 NEGATIVE_BG = "#FEF2F2"     # red-50
 NEUTRAL_BG = "#F8FAFC"      # slate-50
 
-# Chart color palette — 臙脂 lead, distinguishable tones
+# Chart color palette — pastel / light tones
 COLORS = [
-    "#9B2335",  # 臙脂
-    "#D4546A",  # rose
-    "#0891B2",  # cyan
-    "#059669",  # emerald
-    "#7C3AED",  # violet
-    "#D97706",  # amber
+    "#E8A0B0",  # 淡臙脂
+    "#93C5FD",  # light blue
+    "#86EFAC",  # light green
+    "#FCD34D",  # light yellow
+    "#C4B5FD",  # light violet
+    "#67E8F9",  # light cyan
+    "#FDBA74",  # light orange
+    "#F9A8D4",  # light pink
 ]
 
 # Keep backward-compatible alias
@@ -350,9 +352,9 @@ def chart_waterfall(
         text=[f"{v:+,.0f}" if i > 0 else f"{v:,.0f}"
               for i, v in enumerate(values)],
         connector={"line": {"color": BORDER}},
-        increasing={"marker": {"color": POSITIVE}},
-        decreasing={"marker": {"color": NEGATIVE}},
-        totals={"marker": {"color": ACCENT}},
+        increasing={"marker": {"color": "#86EFAC"}},
+        decreasing={"marker": {"color": "#FCA5A5"}},
+        totals={"marker": {"color": "#E8A0B0"}},
     ))
     fig.update_layout(
         title=title,
